@@ -14,7 +14,12 @@
 ;; COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,   ;;
 ;; ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                         ;;
 ;;-------------------------------------------------------------------------------------------------------------------------------;;
+SECTION "Input variables", HRAM
 
+buttonState::
+ds 1
+FlancoAs::
+ds 1 
 SECTION "Entry point", ROM0[$150]
 
 ;ESPERA A ESTAR EN VBLANK PARA PODER HACER CAMBIOS EN LA VRAM
@@ -25,6 +30,38 @@ waitVBlank:
 ret
 
 ;------------------ FUNCIONES PARA EL JOYPAD --------------------
+readJoypad:
+   ld a, $20
+   ld [$FF00], a
+   ld a, [$FF00]
+   ld a, [$FF00]
+   ld a, [$FF00]
+   cpl
+   and $0F
+   swap a 
+   ld b, a 
+
+   ld a, $10
+   ld [$FF00], a
+   ld a, [$FF00]
+   ld a, [$FF00]
+   ld a, [$FF00]
+   cpl
+   and $0F
+
+   or b  ;A = {Abajo|Arriba|Izquierda|Derecha|St|Se|B|A}
+
+   ld b, a
+   ld a, [buttonState]
+   xor b
+   and b
+   ld [FlancoAs], a
+   ld a, b
+   ld [buttonState], a 
+
+   ld a, $30
+   ld [$FF00], a 
+
 
 
 main::
