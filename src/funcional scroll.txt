@@ -1,0 +1,174 @@
+DEF rP1   EQU $FF00
+DEF rLCDC EQU $FF40
+DEF rSCY  EQU $FF42
+DEF rSCX  EQU $FF43
+DEF rLY   EQU $FF44
+DEF rBGP  EQU $FF47
+DEF rOBP0 EQU $FF48
+DEF rDMA  EQU $FF46
+
+; --- Flags LCDC mínimos que faltaban ---
+DEF LCDCF_BGON  EQU %00000001   ; BG enable
+DEF LCDCF_OBJON EQU %00000010   ; Sprites enable
+DEF LCDCF_ON    EQU %10000000   ; LCD on
+
+; --- Joypad: selección (ver Pan Docs) ---
+; Para leer D-Pad: bit4=0, bit5=1 -> escribir $20.  Para “ninguno”: $30.
+DEF P1_GET_DPAD EQU $20
+DEF P1_GET_NONE EQU $30
+
+SECTION "ROM Code", ROM0
+
+; ---- Tiles de fondo (2 tiles = 32 bytes) ----
+; Tile 0: vacío
+TileData:
+    REPT 8
+        db $00, $00
+    ENDR
+; Tile 1: damero simple
+    REPT 8
+        db %10101010, %01010101
+    ENDR
+
+; ---- Tile de sprite (tile index 2) ----
+SpriteTile:
+    db %00011000,%00011000
+    db %00011000,%00011000
+    db %11111111,%11111111
+    db %00011000,%00011000
+    db %00011000,%00011000
+    db %00011000,%00011000
+    db %00000000,%00000000
+    db %00000000,%00000000
+
+; ---- Mapa BG 32x32 (256x256 px). Alterna 0/1 para ver el movimiento. ----
+TileMap:
+    REPT 32
+        REPT 16
+            db 0, 1
+        ENDR
+    ENDR
+
+; ---- Variables en RAM (WRAM no admite inicialización directa) ----
+SECTION "WRAM Vars", WRAM0
+wCameraX:   ds 1
+wCameraY:   ds 1
+wCurKeys:   ds 1
+wPrevKeys:  ds 1
+
+; ---- Punto de entrada que espera tu header ----
+SECTION "Main", ROM0
+main::
+    di
+    ld   sp, $FFFE
+
+    ; --- Copiar tiles BG a $9000 (modo $8800: tile #0 -> $9000) ---
+    ld   de, TileData
+    ld   hl, $9000
+    ld   bc, 2*16
+    call CopyBytes
+
+    ; --- Copiar tile de sprite (tile #2) a $9020 ---
+    ld   de, SpriteTile
+    ld   hl, $9000 + (2*16)
+    ld   bc, 16
+    call CopyBytes
+
+    ; --- Copiar tilemap a $9800 (BG Map 0) ---
+    ld   de, TileMap
+    ld   hl, $9800
+    ld   bc, 32*32
+    call CopyBytes
+
+    ; --- Paletas (DMG) ---
+    ld   a, %11100100
+    ld   [rBGP], a
+    ld   [rOBP0], a
+
+    ; --- Sprite centrado (X=80, Y=72) recordando offset OAM (+8/+16) ---
+    ld   hl, $FE00          ; OAM base
+    ld   a, 72+16           ; Y
+    ld   [hli], a
+    ld   a, 80+8            ; X
+    ld   [hli], a
+    ld   a, 2               ; tile index del sprite
+    ld   [hli], a
+    xor  a
+    ld   [hli], a
+
+    ; --- Encender LCD: BG + Sprites ---
+    ld   a, LCDCF_ON | LCDCF_OBJON | LCDCF_BGON
+    ld   [rLCDC], a
+    ei
+
+MainLoop:
+    ; Esperar VBlank (LY >= 144)
+.waitvb:
+    ld   a, [rLY]
+    cp   144
+    jr   c, .waitvb
+
+    call UpdateKeys
+
+    ; Aplicar scroll (wrap 0..255 por hardware)
+    ld   a, [wCameraY]
+    ld   [rSCY], a
+    ld   a, [wCameraX]
+    ld   [rSCX], a
+
+    jr   MainLoop
+
+; --- Copia BC bytes de (DE) a (HL) ---
+CopyBytes:
+.loop:
+    ld   a, [de]
+    ld   [hl], a
+    inc  de
+    inc  hl
+    dec  bc
+    ld   a, b
+    or   c
+    jr   nz, .loop
+    ret
+
+; --- Lee D-Pad y actualiza cámara. Pulsado = 0 -> invierto. ---
+UpdateKeys:
+    ld   a, [wCurKeys]
+    ld   [wPrevKeys], a
+
+    ld   a, P1_GET_DPAD
+    ld   [rP1], a
+    ; Lecturas para estabilizar (Pan Docs / Cheatsheet)
+    ld   a, [rP1]
+    ld   a, [rP1]
+    ld   a, [rP1]
+    cpl
+    and  $0F
+    ld   [wCurKeys], a
+
+    ; Bits (D-Pad): 0=Right, 1=Left, 2=Up, 3=Down
+    ; UP
+    bit  2, a
+    jr   z, .noUp
+    ld   hl, wCameraY
+    dec  [hl]
+.noUp:
+    ; DOWN
+    bit  3, a
+    jr   z, .noDown
+    ld   hl, wCameraY
+    inc  [hl]
+.noDown:
+    ; LEFT
+    bit  1, a
+    jr   z, .noLeft
+    ld   hl, wCameraX
+    dec  [hl]
+.noLeft:
+    ; RIGHT
+    bit  0, a
+    jr   z, .endKeys
+    ld   hl, wCameraX
+    inc  [hl]
+.endKeys:
+    ret

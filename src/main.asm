@@ -1,157 +1,316 @@
-; ================== main.asm (robusto, sin duplicados) ==================
+
 ; --- Registros HW ---
-DEF rP1   = $FF00
-DEF rSCY  = $FF42
-DEF rSCX  = $FF43
-DEF rLY   = $FF44
-DEF rBGP  = $FF47
-DEF rLCDC = $FF40
-DEF rOBP0 = $FF48
-DEF rWY   = $FF4A
-DEF rWX   = $FF4B
+DEF rP1   EQU $FF00
+DEF rLCDC EQU $FF40
+DEF rSCY  EQU $FF42
+DEF rSCX  EQU $FF43
+DEF rLY   EQU $FF44
+DEF rBGP  EQU $FF47
+DEF rOBP0 EQU $FF48
+DEF rDMA  EQU $FF46
 
-; ====== Tamaño de tu tilemap ======
-; 136x64 px -> 17x8 tiles | 160x144 px -> 20x18 tiles
-DEF MAP_W_T = 17
-DEF MAP_H_T = 8
+; --- Flags LCDC ---
+DEF LCDCF_BGON EQU %00000001
+DEF LCDCF_OBJON EQU %00000010
+DEF LCDCF_ON   EQU %10000000
 
-; ---------- Assets ----------
+; --- Joypad: selección y máscaras ---
+DEF P1F_GET_BTN  EQU $10
+DEF P1F_GET_DPAD EQU $20
+DEF P1F_GET_NONE EQU $30
+
+; Dejamos wCurKeys con 1 = pulsado (más cómodo para AND)
+DEF PADF_RIGHT EQU %00000001
+DEF PADF_LEFT  EQU %00000010
+DEF PADF_UP    EQU %00000100
+DEF PADF_DOWN  EQU %00001000
+
+; --- Constantes de pantalla / sprite / márgenes ---
+DEF SCR_W EQU 160
+DEF SCR_H EQU 144
+DEF SPR_W EQU 8
+DEF SPR_H EQU 8
+
+; Márgenes: distancia (px) desde cada borde donde empieza a scrollear
+DEF H_MARGIN EQU 32      ; izquierda/derecha
+DEF V_MARGIN EQU 24      ; arriba/abajo
+
+; Umbrales de sprite en pantalla (coordenada local del sprite)
+DEF LEFT_LIMIT   EQU H_MARGIN                         ; 32
+DEF RIGHT_LIMIT  EQU (SCR_W - SPR_W - H_MARGIN)       ; 160-8-32 = 120
+DEF TOP_LIMIT    EQU V_MARGIN                         ; 24
+DEF BOTTOM_LIMIT EQU (SCR_H - SPR_H - V_MARGIN)       ; 144-8-24 = 112
+
+DEF SPEED EQU 1  ; px/frame
+
 SECTION "GFX", ROM0
-Tiles:    INCBIN "bp2.2bpp"       ; tiles 2bpp (rgbgfx)
-TilesEnd:
-BGMap:    INCBIN "bp2.tilemap"    ; tilemap (índices) (rgbgfx)
-BGMapEnd:
 
-; ---------- Copia genérica DE->HL (BC bytes) ----------
-SECTION "Utils", ROM0
-MemcpyVRAM:
-.copy:
-    ld a,b
-    or c
-    ret z
-    ld a,[de]
-    inc de
-    ld [hl+],a
-    dec bc
-    jr .copy
+; 2 tiles de fondo (rayas) -> $9000
+TileData:
+  REPT 8
+    db $00, $00
+  ENDR
+  REPT 8
+    db %10101010, %01010101
+  ENDR
+TileDataEnd:
 
-; ---------- Limpiar un BG map 32x32 completo con tile 0 ----------
-; Entrada: HL = $9800 o $9C00
-ClearBG32x32:
-    ld  bc, 32*32          ; 1024 bytes
-    xor a                  ; tile 0
-.bgclear:
-    ld  [hl+],a
-    dec bc
-    ld  a,b
-    or  c
-    jr  nz,.bgclear
-    ret
+; 1 tile de sprite sencillo -> $9020
+SpriteTile:
+  db %00011000,%00011000
+  db %00011000,%00011000
+  db %11111111,%11111111
+  db %00011000,%00011000
+  db %00011000,%00011000
+  db %00011000,%00011000
+  db %00000000,%00000000
+  db %00000000,%00000000
+SpriteTileEnd:
 
-; ---------- Copiar tu tilemap W×H a $9800 sumando +1 ----------
-; (Tus tiles se cargan desde $8010 => empiezan en tile #1)
-CopyBGMapWH_Add1:
-    ld  hl,$9800           ; destino: BG map 0
-    ld  de,BGMap           ; origen: tu tilemap
-    ld  b, MAP_H_T         ; filas
-.row:
-    ld  c, MAP_W_T         ; columnas
-.col:
-    ld  a,[de]
-    inc de
-    inc a                  ; +1 -> ajusta al desplazamiento de tiles
-    ld  [hl+],a
-    dec c
-    jr  nz,.col
-    ; saltar (32 - MAP_W_T) en VRAM
-    ld  a, 32 - MAP_W_T
-.sk:
-    inc hl
-    dec a
-    jr  nz,.sk
-    dec b
-    jr  nz,.row
-    ret
+; Tilemap 32x32 (256x256 px) alternando 0/1
+TileMap:
+  REPT 32
+    REPT 16
+      db 0, 1
+    ENDR
+  ENDR
+TileMapEnd:
 
-; ---------- Ocultar TODOS los sprites (por si luego activas OBJ) ----------
-; 40 sprites * 4 bytes. Y=160 => fuera de pantalla.
-HideAllSprites:
-    ld  hl,$FE00
-    ld  b,40
-.loop:
-    ld  a,$A0              ; Y = 160
-    ld  [hl+],a
-    xor a
-    ld  [hl+],a            ; X = 0
-    ld  [hl+],a            ; tile = 0
-    ld  [hl+],a            ; flags = 0
-    dec b
-    jr  nz,.loop
-    ret
+; ----------------- Variables -----------------
+SECTION "WRAM Vars", WRAM0
+wCameraX:   ds 1
+wCameraY:   ds 1
+wPlayerX:   ds 1
+wPlayerY:   ds 1
+wCurKeys:   ds 1
+wPrevKeys:  ds 1
 
-; ------------------ Entry & helpers ------------------
-SECTION "Entry point", ROM0[$150]
-waitVBlank:
-   ldh a,[rLY]
-   cp 144
-   jr nz, waitVBlank
-   ret
+; ----------------- Código -----------------
+SECTION "Main", ROM0
 
-; ------------------ MAIN --------------------
 main::
-    ; 1) LCD OFF (escritura segura en VRAM/OAM)
-    ldh a,[rLCDC]
-    res 7,a
-    ldh [rLCDC],a
+  di
+  ld sp, $FFFE
 
-    ; 2) Paletas
-    ld a,%11100100         ; BGP (fondo)
-    ldh [rBGP],a
-    ld a,%11100100         ; OBP0 (sprites) por si luego los usas
-    ldh [rOBP0],a
+  ; Paletas
+  ld a, %11100100
+  ld [rBGP], a
+  ld [rOBP0], a
 
-    ; 3) Ventana fuera de pantalla (además de estar OFF por LCDC bit5=0)
-    ld a,$A0               ; WY=160 (>143)
-    ldh [rWY],a
-    ld a,$A7               ; WX=167 (offset -7)
-    ldh [rWX],a
+  ; Cargar tiles BG a $9000 (tile 0 y 1)
+  ld de, TileData
+  ld hl, $9000
+  ld bc, TileDataEnd - TileData
+  call CopyBytes
 
-    ; 4) TILE 0 vacío en $8000 (16 bytes a 0)
-    ld  hl,$8000
-    ld  b,16
-    xor a
-.t0:
-    ld  [hl+],a
-    dec b
-    jr  nz,.t0
+  ; Cargar tile de sprite a $9020 (tile #2)
+  ld de, SpriteTile
+  ld hl, $9000 + (2*16)
+  ld bc, SpriteTileEnd - SpriteTile
+  call CopyBytes
 
-    ; 5) Cargar tus tiles desde $8010 (tile #1 en adelante)
-    ld  hl,$8010
-    ld  de,Tiles
-    ld  bc, TilesEnd - Tiles
-    call MemcpyVRAM
+  ; Cargar tilemap (32x32) a $9800
+  ld de, TileMap
+  ld hl, $9800
+  ld bc, TileMapEnd - TileMap
+  call CopyBytes
 
-    ; 6) Limpiar ambos BG maps 32×32 (por si hubiese residuos)
-    ld  hl,$9800
-    call ClearBG32x32
-    ld  hl,$9C00
-    call ClearBG32x32
+  ; Inicializar cámara y jugador en mundo (0..255)
+  xor a
+  ld [wCameraX], a
+  ld [wCameraY], a
+  ld a, 80
+  ld [wPlayerX], a
+  ld a, 72
+  ld [wPlayerY], a
 
-    ; 7) Pegar tu tilemap W×H en $9800 con +1
-    call CopyBGMapWH_Add1
+  ; Inicializar input
+  xor a
+  ld [wCurKeys], a
+  ld [wPrevKeys], a
 
-    ; 8) Ocultar sprites (aunque OBJ estará OFF, dejamos OAM limpio)
-    call HideAllSprites
+  ; Encender LCD: BG + Sprites
+  ld a, LCDCF_ON | LCDCF_OBJON | LCDCF_BGON
+  ld [rLCDC], a
+  ei
 
-    ; 9) Scroll a 0
-    xor a
-    ldh [rSCX],a
-    ldh [rSCY],a
+; =================== Bucle principal ===================
+MainLoop:
+  ; --- 1) INPUT + LÓGICA (fuera de VBlank) ---
+  call UpdateKeys
 
-    ; 10) LCD ON (BG ON, tiles $8000, BG map $9800, WINDOW OFF, OBJ OFF)
-    ; bit7 LCD ON | bit4 $8000 | bit3 $9800 | bit5=0 ventana OFF | bit1=0 OBJ OFF | bit0 BG ON
-    ld  a,%10010001        ; $91
-    ldh [rLCDC],a
+  ; --------- Movimiento del jugador (mundo) ---------
+  ; RIGHT
+  ld a, [wCurKeys]
+  and PADF_RIGHT
+  jr z, .noRight
+    ld hl, wPlayerX
+    inc [hl]
+  .noRight:
 
-    di
-    halt
+  ; LEFT
+  ld a, [wCurKeys]
+  and PADF_LEFT
+  jr z, .noLeft
+    ld hl, wPlayerX
+    dec [hl]
+  .noLeft:
+
+  ; UP
+  ld a, [wCurKeys]
+  and PADF_UP
+  jr z, .noUp
+    ld hl, wPlayerY
+    dec [hl]
+  .noUp:
+
+  ; DOWN
+  ld a, [wCurKeys]
+  and PADF_DOWN
+  jr z, .noDown
+    ld hl, wPlayerY
+    inc [hl]
+  .noDown:
+
+  ; --------- Cámara con márgenes (dead-zone) ---------
+  ; scrX = playerX - cameraX
+  ld a, [wCameraX]
+  ld c, a
+  ld a, [wPlayerX]
+  sub c                  ; A = scrX
+  ; Si scrX > RIGHT_LIMIT -> cameraX += SPEED
+  cp RIGHT_LIMIT
+  jr c, .chkLeftX
+  jr z, .chkLeftX
+    ld hl, wCameraX
+    inc [hl]
+  .chkLeftX:
+  ; recomputar scrX y comparar con LEFT_LIMIT
+  ld a, [wCameraX]
+  ld c, a
+  ld a, [wPlayerX]
+  sub c
+  cp LEFT_LIMIT
+  jr nc, .doneX
+    ld hl, wCameraX
+    dec [hl]
+  .doneX:
+
+  ; scrY = playerY - cameraY
+  ld a, [wCameraY]
+  ld c, a
+  ld a, [wPlayerY]
+  sub c                  ; A = scrY
+  ; Si scrY > BOTTOM_LIMIT -> cameraY += SPEED
+  cp BOTTOM_LIMIT
+  jr c, .chkTopY
+  jr z, .chkTopY
+    ld hl, wCameraY
+    inc [hl]
+  .chkTopY:
+  ; recomputar scrY y comparar con TOP_LIMIT
+  ld a, [wCameraY]
+  ld c, a
+  ld a, [wPlayerY]
+  sub c
+  cp TOP_LIMIT
+  jr nc, .doneY
+    ld hl, wCameraY
+    dec [hl]
+  .doneY:
+
+  call WaitVBlank
+
+  ; --- 3) COMMIT a HW (dentro de VBlank) ---
+  ; 3a) Scroll HW
+  ld a, [wCameraY]
+  ld [rSCY], a
+  ld a, [wCameraX]
+  ld [rSCX], a
+
+  ; 3b) Escribir sprite en OAM: (player - camera) + offsets OAM
+  ld hl, $FE00
+  ; Y
+  ld a, [wCameraY]
+  ld c, a
+  ld a, [wPlayerY]
+  sub c                  ; scrY
+  add 16                 ; offset Y OAM
+  ld [hli], a
+  ; X
+  ld a, [wCameraX]
+  ld c, a
+  ld a, [wPlayerX]
+  sub c                  ; scrX
+  add 8                  ; offset X OAM
+  ld [hli], a
+  ; tile / flags
+  ld a, 2
+  ld [hli], a
+  xor a
+  ld [hli], a
+
+  jp MainLoop
+
+; =================== Rutinas ===================
+
+CopyBytes:
+  ld a, b
+  or c
+  ret z
+.cb_loop:
+  ld a, [de]
+  ld [hl], a
+  inc de
+  inc hl
+  dec bc
+  ld a, b
+  or c
+  jp nz, .cb_loop
+  ret
+
+
+WaitVBlank:
+.wvb:
+  ld a, [rLY]
+  cp 144
+  jr c, .wvb
+  ret
+
+; Lectura de Joypad -> wCurKeys (1 = pulsado)
+
+UpdateKeys:
+  ;
+  ld a, [wCurKeys]
+  ld [wPrevKeys], a
+
+  ; Botones (A,B,Select,Start) 
+  ld a, P1F_GET_BTN
+  ldh [rP1], a
+  call .settle
+  ldh a, [rP1]
+  or $F0
+  cpl
+  and $0F
+  ld b, a                 
+
+  ; D-Pad
+  ld a, P1F_GET_DPAD
+  ldh [rP1], a
+  call .settle
+  ldh a, [rP1]
+  or $F0
+  cpl
+  and $0F                  ; 1=pulsado (Right, Left, Up, Down)
+  ld [wCurKeys], a
+
+  ; liberar
+  ld a, P1F_GET_NONE
+  ldh [rP1], a
+  ret
+
+.settle:
+  ldh a, [rP1]
+  ldh a, [rP1]
+  ldh a, [rP1]
+  ret
