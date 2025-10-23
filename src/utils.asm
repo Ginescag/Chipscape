@@ -1,19 +1,6 @@
 INCLUDE "constantes.inc"
 
-
 SECTION "utils", ROM0
-
-; clear_oam_buf::
-;     xor a
-;     ld hl, OAMBuffer
-;     ld bc, OAM_BYTES
-;     .c:
-;         ld [hl+], a
-;         dec bc
-;         ld a, b
-;         or c
-;         jr nz, .c
-; ret
 
 apaga_pantalla::
     di 
@@ -32,38 +19,12 @@ enciende_pantalla::
     ei
 ret
 
-; void set_sprite_idx(a=idx, b=y, c=x, d=tile, e=attr)
-; set_sprite_idx::
-;     ; HL = OAMBuffer + idx*4
-;     add a, a
-;     add a, a          ; a = idx*4
-;     ld h, HIGH(OAMBuffer)
-;     ld l, LOW(OAMBuffer)
-;     ld b, 0
-;     ld c, a
-;     add hl, bc
-;     ; escribir [Y][X][TILE][ATTR]
-;     ld a, b           ; y
-;     ld [hl+], a
-;     ld a, c           ; x
-;     ld [hl+], a
-;     ld a, d           ; tile
-;     ld [hl+], a
-;     ld a, e           ; attr
-;     ld [hl],  a
-; ret
-
-; start_oam_dma::
-;     ld a, HIGH(OAMBuffer) ; $C1 si OAMBuffer=$C100
-;     ld [rDMA], a          ; copia $C100..$C19F -> $FE00..$FE9F
-; ret
-
 ;; HL = "source", DE = "Destiny" B = counter
 memcpy::
     ld a, [hl+]
     ld [de], a
     inc de
-    dec bc
+    dec b
     jr nz, memcpy
 ret
 
@@ -82,25 +43,40 @@ changeObjPalette::
 changeBGP::
     ld   [rBGP],  a
 
-escribir_linea::
-    ld b, 31 
+writeLine:
+    ld [hl], b
+    inc hl
+    dec e
+    jr nz, writeLine
+ret
+  
+writeScreen:
+    call wait_vblank
+    call writeLine
+    inc hl
+    ld e, 28
+    dec c
+    jr nz, writeScreen
+ret
+
+;; HL = Destiny
+;; B = bytes
+;; A = value
+memset_256::
     ld [hl+], a
     dec b
-    jr nz, escribir_linea
-ret 
-
-
-escribir_pantalla::
-    ld c, 31
-    ld b, 31
-    call escribir_linea
-    inc l
-    jr nc, .next
-    inc h
-    .next:
-        dec c
-    jr nz, escribir_pantalla
+    jr nz, memset_256
 ret
 
 
+BORRAR_OAM::
+    ld hl, OAM_START
+    ld b, SPRITES_TOTAL
+    xor a
+    call memset_256
+ret
 
+
+;; PARA HACER CALL HL
+helper_call_HL::
+    jp hl

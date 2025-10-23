@@ -1,13 +1,13 @@
 SECTION "Tiles", ROM0
 
-tile_player_top:
+tile_player_top::
     DB $18,$18, $00,$3C, $3C,$66, $7E,$81
     DB $7E,$99, $00,$7E, $81,$7E, $81,$7E
 
-tile_player_bottom:
+tile_player_bottom::
     DB $00,$7E, $00,$7E, $00,$66, $00,$66
     DB $00,$66, $66,$66, $E7,$E7, $00,$00
 
-tile_bg_blank:
+tile_bg_blank::
     DB $00,$00,$00,$00,$00,$00,$00,$00
     DB $00,$00,$00,$00,$00,$00,$00,$00

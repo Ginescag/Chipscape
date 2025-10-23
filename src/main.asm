@@ -1,14 +1,12 @@
 INCLUDE "constantes.inc"
 
-SECTION "main", ROM0[$0150]
-
+SECTION "Entry point", ROM0
 
 main::
 
-  ld hl, $9800
+  call game_engine_init
+  call sc01_init
+  call sc01_run
 
-  ld a, $19
-  ld [hl], a
-
-  di 
+  di     ;; Disable Interrupts
   halt 
