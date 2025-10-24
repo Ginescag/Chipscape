@@ -24,7 +24,6 @@ SECTION "ChipCount Code", ROM0
 EXPORT ChipCount_Reset, ChipCount_SetA, ChipCount_AddA
 EXPORT ChipCount_HUD_Init, ChipCount_HUD_Update
 
-; Pone chips=0
 ChipCount_Reset:
   xor a
   ld [wChips], a

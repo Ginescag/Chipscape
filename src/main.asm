@@ -60,12 +60,10 @@ main::
     di
     ld sp, $FFFE
 
-    ; Paletas
     ld a, %11100100
     ld [rBGP], a
     ld [rOBP0], a
 
-    ; Apagar LCD para cargar VRAM sin restricciones
     ld a, [rLCDC]
     res 7, a
     ld [rLCDC], a
@@ -87,7 +85,6 @@ main::
 
     call ClearOAM
 
-    ; Sprite jugador
     ld hl, OAM_BASE
     ld a, 72 + 16               
     ld [hl], a
@@ -106,7 +103,6 @@ main::
     ld a, WIN_WX_ON
     ld [rWX], a
 
-    ; Inicializar HUDs
     call Score_Reset
     call Score_HUD_Init
     call ChipCount_Reset
@@ -114,7 +110,6 @@ main::
     call Timer_ComputeDigits
     call Timer_HUD_Init
 
-    ; Recorte Window tras 16 líneas
     ld a, HUD_CLIP_LINES
     ld [rLYC], a
     ld a, [rSTAT]
@@ -122,18 +117,15 @@ main::
     or  STATF_LYC
     ld [rSTAT], a
 
-    ; Encender LCD
     ld a, LCDCF_ON | LCDCF_OBJON | LCDCF_BGON | LCDCF_TILE8000 | LCDCF_WINON | LCDCF_WIN9C00
     ld [rLCDC], a
 
-    ; Habilitar interrupciones
     ld a, [rIE]
     or IEF_VBLANK | IEF_STAT
     ld [rIE], a
 
     ei
 
-; =================== Bucle principal ===================
 MainLoop:
     call Input_Read
     call Player_Update
@@ -142,7 +134,6 @@ MainLoop:
    
     call WaitVBlank
 
-    ;Tick del timer 
     ld a, [wTimerFlag1s]
     or a
     jr z, .no1s
@@ -170,14 +161,13 @@ MainLoop:
     call ChipCount_AddA
 .no1s:
 
-    ; Scroll BG
     ld a, [wCameraY]
     ld [rSCY], a
     ld a, [wCameraX]
     ld [rSCX], a
 
     ld hl, OAM_BASE
-    ; Y
+   
     ld a, [wCameraY]
     ld c, a
     ld a, [wPlayerY]
@@ -185,7 +175,6 @@ MainLoop:
     add 16
     ld [hl], a
     inc l
-    ; X
     ld a, [wCameraX]
     ld c, a
     ld a, [wPlayerX]
@@ -193,11 +182,9 @@ MainLoop:
     add 8
     ld [hl], a
     inc l
-    ; tile
     ld a, 2
     ld [hl], a
     inc l
-    ; flags
     xor a
     ld [hl], a
 
