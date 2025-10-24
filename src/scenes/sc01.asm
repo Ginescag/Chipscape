@@ -11,6 +11,14 @@ sc01_init::
   ld b, 64
   call memcpy
 
+  call wait_vblank
+  ld hl, FLATLINE_front1
+  ld de, VRAM_TILEDATA_START + $1E * VRAM_TILE_SIZE
+  ld b, 64
+  call memcpy
+
+
+
   ld   a, %11100100
   ld  [rOBP0], a
   ld [rBGP], a
@@ -57,31 +65,4 @@ sc01_run::
   call wait_vblank
   call man_entity_draw
   jr .loop
-ret
-
-;;DE = entidad a procesar
-sys_physics_update_one_entity::
-  ld h, CMP_PHYSICS_H
-  ld d, CMP_SPRITE_H
-  ld l, e
-  
-  ld a, l
-  add CMP_PH_VX
-  ld l,a 
-  
-  ld b, [hl]
-
-  ld a, e
-  add CMP_SPRITE_X
-  ld e, a 
-  
-  ld a, [de]
-  add b
-  ld [de], a
-
-ret
-
-sys_physics_update::
-  ld hl, sys_physics_update_one_entity
-  call man_entity_for_each
 ret

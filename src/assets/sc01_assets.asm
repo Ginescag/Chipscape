@@ -7,5 +7,5 @@ sc01_entity1::   ;;SPRITE + PHYSICS
 
     sc01_entity2::
     DB 16, 40, $1C, %00000000
-    DB 16, 40, 01, 00
+    DB 16, 40, 01, 01
   

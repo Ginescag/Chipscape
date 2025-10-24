@@ -8,5 +8,6 @@ main::
   call sc01_init
   call sc01_run
 
+
   di     ;; Disable Interrupts
   halt 

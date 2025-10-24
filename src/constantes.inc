@@ -18,6 +18,7 @@ DEF rSCY  EQU $FF42
 DEF rSCX  EQU $FF43
 DEF rBGP  EQU $FF47
 DEF rOBP0 EQU $FF48
+DEF rOBP1 EQU $FF49
 DEF rDMA  EQU $FF46
 
 ;;========================================================================
@@ -52,11 +53,30 @@ DEF PADF_DOWN  EQU %00001000
 ;;CMP_INFO_FIELDS
 rsreset
 DEF CMP_INFO_CMPS   RB 1
-DEF CMP_INFO_TAGS   RB 1 ;;SAFRIDMCP Sentinel, Alive, Colisionable, Fisicas, Interactuable, Mortal, movible, COLISION, PICK-UP                        
+DEF CMP_INFO_TAGS   RB 1 ;;SAFRIDMC Sentinel, Alive, Fisicas, render, Interactuable, Mortal, movible, COLISION                        
                          ;;00000000
-DEF CMP_INFO_TYPE   RB 1
-DEF CMP_INFO_FREE2  RB 1
+DEF CMP_INFO_TYPE   RB 1 ;;JEPSfwew Jugador, Enemigo, Pickup, specialitem fireSI waterSI earthSI windSI //ESTO ES UN EJEMPLO Y PUEDE CAMBIAR
+                         ;;00000000
+DEF CMP_INFO_HP     RB 1 ;; VIDA DE LA ENTIDAD
 DEF CMP_SIZE        RB 0
+
+;;BITS DEL TIPO PARA SABER LO QUE SON
+DEF T_PLAYER      EQU %10000000  ; bit7
+DEF T_ENEMY       EQU %01000000  ; bit6
+DEF T_PICKUP      EQU %00100000  ; bit5
+DEF T_SITEM       EQU %00010000  ; bit4
+
+; Subtipos para SPECIAL_ITEM (nibble bajo)
+DEF SI_FIRE       EQU %00000001  ; bit0
+DEF SI_WATER      EQU %00000010  ; bit1
+DEF SI_EARTH      EQU %00000100  ; bit2
+DEF SI_WIND       EQU %00001000  ; bit3
+
+; Máscaras útiles
+DEF CLASS_MASK    EQU %11110000
+DEF SITEM_MASK    EQU %00001111
+
+
 
 ;;CMP_PHYSICS_FIELDS
 rsreset
