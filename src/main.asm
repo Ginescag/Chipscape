@@ -1,316 +1,210 @@
+INCLUDE "inc/hardware.inc"
+INCLUDE "inc/constants.inc"
 
-; --- Registros HW ---
-DEF rP1   EQU $FF00
-DEF rLCDC EQU $FF40
-DEF rSCY  EQU $FF42
-DEF rSCX  EQU $FF43
-DEF rLY   EQU $FF44
-DEF rBGP  EQU $FF47
-DEF rOBP0 EQU $FF48
-DEF rDMA  EQU $FF46
+IF !DEF(rWY)
+  DEF rWY   EQU $FF4A
+ENDC
+IF !DEF(rWX)
+  DEF rWX   EQU $FF4B
+ENDC
+IF !DEF(rSTAT)
+  DEF rSTAT EQU $FF41
+ENDC
+IF !DEF(rLY)
+  DEF rLY   EQU $FF44
+ENDC
+IF !DEF(rLYC)
+  DEF rLYC  EQU $FF45
+ENDC
+IF !DEF(rIE)
+  DEF rIE   EQU $FFFF
+ENDC
 
-; --- Flags LCDC ---
-DEF LCDCF_BGON EQU %00000001
-DEF LCDCF_OBJON EQU %00000010
-DEF LCDCF_ON   EQU %10000000
+IF !DEF(LCDCF_TILE8000)
+  DEF LCDCF_TILE8000  EQU %00010000   
+ENDC
+IF !DEF(LCDCF_WINON)
+  DEF LCDCF_WINON     EQU %00100000   
+ENDC
+IF !DEF(LCDCF_WIN9C00)
+  DEF LCDCF_WIN9C00   EQU %01000000   
+ENDC
 
-; --- Joypad: selección y máscaras ---
-DEF P1F_GET_BTN  EQU $10
-DEF P1F_GET_DPAD EQU $20
-DEF P1F_GET_NONE EQU $30
+IF !DEF(STATF_LYC)
+  DEF STATF_LYC       EQU %01000000   
+ENDC
 
-; Dejamos wCurKeys con 1 = pulsado (más cómodo para AND)
-DEF PADF_RIGHT EQU %00000001
-DEF PADF_LEFT  EQU %00000010
-DEF PADF_UP    EQU %00000100
-DEF PADF_DOWN  EQU %00001000
+IF !DEF(IEF_VBLANK)
+  DEF IEF_VBLANK      EQU %00000001
+ENDC
+IF !DEF(IEF_STAT)
+  DEF IEF_STAT        EQU %00000010
+ENDC
+IF !DEF(IEF_TIMER)
+  DEF IEF_TIMER       EQU %00000100
+ENDC
 
-; --- Constantes de pantalla / sprite / márgenes ---
-DEF SCR_W EQU 160
-DEF SCR_H EQU 144
-DEF SPR_W EQU 8
-DEF SPR_H EQU 8
+DEF HUD_CLIP_LINES    EQU 16
 
-; Márgenes: distancia (px) desde cada borde donde empieza a scrollear
-DEF H_MARGIN EQU 32      ; izquierda/derecha
-DEF V_MARGIN EQU 24      ; arriba/abajo
+IF !DEF(WIN_WX_ON)
+  DEF WIN_WX_ON   EQU 7
+ENDC
+IF !DEF(WIN_WX_OFF)
+  DEF WIN_WX_OFF  EQU 168
+ENDC
 
-; Umbrales de sprite en pantalla (coordenada local del sprite)
-DEF LEFT_LIMIT   EQU H_MARGIN                         ; 32
-DEF RIGHT_LIMIT  EQU (SCR_W - SPR_W - H_MARGIN)       ; 160-8-32 = 120
-DEF TOP_LIMIT    EQU V_MARGIN                         ; 24
-DEF BOTTOM_LIMIT EQU (SCR_H - SPR_H - V_MARGIN)       ; 144-8-24 = 112
-
-DEF SPEED EQU 1  ; px/frame
-
-SECTION "GFX", ROM0
-
-; 2 tiles de fondo (rayas) -> $9000
-TileData:
-  REPT 8
-    db $00, $00
-  ENDR
-  REPT 8
-    db %10101010, %01010101
-  ENDR
-TileDataEnd:
-
-; 1 tile de sprite sencillo -> $9020
-SpriteTile:
-  db %00011000,%00011000
-  db %00011000,%00011000
-  db %11111111,%11111111
-  db %00011000,%00011000
-  db %00011000,%00011000
-  db %00011000,%00011000
-  db %00000000,%00000000
-  db %00000000,%00000000
-SpriteTileEnd:
-
-; Tilemap 32x32 (256x256 px) alternando 0/1
-TileMap:
-  REPT 32
-    REPT 16
-      db 0, 1
-    ENDR
-  ENDR
-TileMapEnd:
-
-; ----------------- Variables -----------------
-SECTION "WRAM Vars", WRAM0
-wCameraX:   ds 1
-wCameraY:   ds 1
-wPlayerX:   ds 1
-wPlayerY:   ds 1
-wCurKeys:   ds 1
-wPrevKeys:  ds 1
-
-; ----------------- Código -----------------
 SECTION "Main", ROM0
+EXPORT main
 
 main::
-  di
-  ld sp, $FFFE
+    di
+    ld sp, $FFFE
 
-  ; Paletas
-  ld a, %11100100
-  ld [rBGP], a
-  ld [rOBP0], a
+    ; Paletas
+    ld a, %11100100
+    ld [rBGP], a
+    ld [rOBP0], a
 
-  ; Cargar tiles BG a $9000 (tile 0 y 1)
-  ld de, TileData
-  ld hl, $9000
-  ld bc, TileDataEnd - TileData
-  call CopyBytes
+    ; Apagar LCD para cargar VRAM sin restricciones
+    ld a, [rLCDC]
+    res 7, a
+    ld [rLCDC], a
 
-  ; Cargar tile de sprite a $9020 (tile #2)
-  ld de, SpriteTile
-  ld hl, $9000 + (2*16)
-  ld bc, SpriteTileEnd - SpriteTile
-  call CopyBytes
+    call Gfx_LoadTiles          
+    call Timer_LoadTiles        
+    call Score_LoadTiles        
+    call Gfx_LoadTileMap        
 
-  ; Cargar tilemap (32x32) a $9800
-  ld de, TileMap
-  ld hl, $9800
-  ld bc, TileMapEnd - TileMap
-  call CopyBytes
+    call Camera_Reset
+    call Player_Init
 
-  ; Inicializar cámara y jugador en mundo (0..255)
-  xor a
-  ld [wCameraX], a
-  ld [wCameraY], a
-  ld a, 80
-  ld [wPlayerX], a
-  ld a, 72
-  ld [wPlayerY], a
+    xor a
+    ld [wTimerFlag1s], a
 
-  ; Inicializar input
-  xor a
-  ld [wCurKeys], a
-  ld [wPrevKeys], a
+    ld hl, 120
+    call Timer_SetSecsHL
+    call Timer_Init
 
-  ; Encender LCD: BG + Sprites
-  ld a, LCDCF_ON | LCDCF_OBJON | LCDCF_BGON
-  ld [rLCDC], a
-  ei
+    call ClearOAM
+
+    ; Sprite jugador
+    ld hl, OAM_BASE
+    ld a, 72 + 16               
+    ld [hl], a
+    inc l
+    ld a, 80 + 8                
+    ld [hl], a
+    inc l
+    ld a, 2                    
+    ld [hl], a
+    inc l
+    xor a
+    ld [hl], a
+
+    xor a
+    ld [rWY], a
+    ld a, WIN_WX_ON
+    ld [rWX], a
+
+    ; Inicializar HUDs
+    call Score_Reset
+    call Score_HUD_Init
+    call ChipCount_Reset
+    call ChipCount_HUD_Init
+    call Timer_ComputeDigits
+    call Timer_HUD_Init
+
+    ; Recorte Window tras 16 líneas
+    ld a, HUD_CLIP_LINES
+    ld [rLYC], a
+    ld a, [rSTAT]
+    and %11000111
+    or  STATF_LYC
+    ld [rSTAT], a
+
+    ; Encender LCD
+    ld a, LCDCF_ON | LCDCF_OBJON | LCDCF_BGON | LCDCF_TILE8000 | LCDCF_WINON | LCDCF_WIN9C00
+    ld [rLCDC], a
+
+    ; Habilitar interrupciones
+    ld a, [rIE]
+    or IEF_VBLANK | IEF_STAT
+    ld [rIE], a
+
+    ei
 
 ; =================== Bucle principal ===================
 MainLoop:
-  ; --- 1) INPUT + LÓGICA (fuera de VBlank) ---
-  call UpdateKeys
+    call Input_Read
+    call Player_Update
+    call Camera_Update
 
-  ; --------- Movimiento del jugador (mundo) ---------
-  ; RIGHT
-  ld a, [wCurKeys]
-  and PADF_RIGHT
-  jr z, .noRight
-    ld hl, wPlayerX
-    inc [hl]
-  .noRight:
+   
+    call WaitVBlank
 
-  ; LEFT
-  ld a, [wCurKeys]
-  and PADF_LEFT
-  jr z, .noLeft
-    ld hl, wPlayerX
-    dec [hl]
-  .noLeft:
+    ;Tick del timer 
+    ld a, [wTimerFlag1s]
+    or a
+    jr z, .no1s
+    xor a
+    ld [wTimerFlag1s], a
 
-  ; UP
-  ld a, [wCurKeys]
-  and PADF_UP
-  jr z, .noUp
-    ld hl, wPlayerY
-    dec [hl]
-  .noUp:
+    ld a, [wTimerHi]
+    ld h, a
+    ld a, [wTimerLo]
+    ld l, a
+    ld a, h
+    or l
+    jr z, .no1s
 
-  ; DOWN
-  ld a, [wCurKeys]
-  and PADF_DOWN
-  jr z, .noDown
-    ld hl, wPlayerY
-    inc [hl]
-  .noDown:
+    dec hl
+    ld a, l
+    ld [wTimerLo], a
+    ld a, h
+    ld [wTimerHi], a
+    call Timer_ComputeDigits
 
-  ; --------- Cámara con márgenes (dead-zone) ---------
-  ; scrX = playerX - cameraX
-  ld a, [wCameraX]
-  ld c, a
-  ld a, [wPlayerX]
-  sub c                  ; A = scrX
-  ; Si scrX > RIGHT_LIMIT -> cameraX += SPEED
-  cp RIGHT_LIMIT
-  jr c, .chkLeftX
-  jr z, .chkLeftX
-    ld hl, wCameraX
-    inc [hl]
-  .chkLeftX:
-  ; recomputar scrX y comparar con LEFT_LIMIT
-  ld a, [wCameraX]
-  ld c, a
-  ld a, [wPlayerX]
-  sub c
-  cp LEFT_LIMIT
-  jr nc, .doneX
-    ld hl, wCameraX
-    dec [hl]
-  .doneX:
+    ld bc, 1
+    call Score_AddBC
+    ld a, 1
+    call ChipCount_AddA
+.no1s:
 
-  ; scrY = playerY - cameraY
-  ld a, [wCameraY]
-  ld c, a
-  ld a, [wPlayerY]
-  sub c                  ; A = scrY
-  ; Si scrY > BOTTOM_LIMIT -> cameraY += SPEED
-  cp BOTTOM_LIMIT
-  jr c, .chkTopY
-  jr z, .chkTopY
-    ld hl, wCameraY
-    inc [hl]
-  .chkTopY:
-  ; recomputar scrY y comparar con TOP_LIMIT
-  ld a, [wCameraY]
-  ld c, a
-  ld a, [wPlayerY]
-  sub c
-  cp TOP_LIMIT
-  jr nc, .doneY
-    ld hl, wCameraY
-    dec [hl]
-  .doneY:
+    ; Scroll BG
+    ld a, [wCameraY]
+    ld [rSCY], a
+    ld a, [wCameraX]
+    ld [rSCX], a
 
-  call WaitVBlank
+    ld hl, OAM_BASE
+    ; Y
+    ld a, [wCameraY]
+    ld c, a
+    ld a, [wPlayerY]
+    sub c
+    add 16
+    ld [hl], a
+    inc l
+    ; X
+    ld a, [wCameraX]
+    ld c, a
+    ld a, [wPlayerX]
+    sub c
+    add 8
+    ld [hl], a
+    inc l
+    ; tile
+    ld a, 2
+    ld [hl], a
+    inc l
+    ; flags
+    xor a
+    ld [hl], a
 
-  ; --- 3) COMMIT a HW (dentro de VBlank) ---
-  ; 3a) Scroll HW
-  ld a, [wCameraY]
-  ld [rSCY], a
-  ld a, [wCameraX]
-  ld [rSCX], a
+    call HideUnusedSprites
 
-  ; 3b) Escribir sprite en OAM: (player - camera) + offsets OAM
-  ld hl, $FE00
-  ; Y
-  ld a, [wCameraY]
-  ld c, a
-  ld a, [wPlayerY]
-  sub c                  ; scrY
-  add 16                 ; offset Y OAM
-  ld [hli], a
-  ; X
-  ld a, [wCameraX]
-  ld c, a
-  ld a, [wPlayerX]
-  sub c                  ; scrX
-  add 8                  ; offset X OAM
-  ld [hli], a
-  ; tile / flags
-  ld a, 2
-  ld [hli], a
-  xor a
-  ld [hli], a
+    call Timer_HUD_Update
+    call Score_HUD_Update
+    call ChipCount_HUD_Update
 
-  jp MainLoop
-
-; =================== Rutinas ===================
-
-CopyBytes:
-  ld a, b
-  or c
-  ret z
-.cb_loop:
-  ld a, [de]
-  ld [hl], a
-  inc de
-  inc hl
-  dec bc
-  ld a, b
-  or c
-  jp nz, .cb_loop
-  ret
-
-
-WaitVBlank:
-.wvb:
-  ld a, [rLY]
-  cp 144
-  jr c, .wvb
-  ret
-
-; Lectura de Joypad -> wCurKeys (1 = pulsado)
-
-UpdateKeys:
-  ;
-  ld a, [wCurKeys]
-  ld [wPrevKeys], a
-
-  ; Botones (A,B,Select,Start) 
-  ld a, P1F_GET_BTN
-  ldh [rP1], a
-  call .settle
-  ldh a, [rP1]
-  or $F0
-  cpl
-  and $0F
-  ld b, a                 
-
-  ; D-Pad
-  ld a, P1F_GET_DPAD
-  ldh [rP1], a
-  call .settle
-  ldh a, [rP1]
-  or $F0
-  cpl
-  and $0F                  ; 1=pulsado (Right, Left, Up, Down)
-  ld [wCurKeys], a
-
-  ; liberar
-  ld a, P1F_GET_NONE
-  ldh [rP1], a
-  ret
-
-.settle:
-  ldh a, [rP1]
-  ldh a, [rP1]
-  ldh a, [rP1]
-  ret
+    jp MainLoop

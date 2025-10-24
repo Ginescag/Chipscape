@@ -1,13 +1,59 @@
-SECTION "Tiles", ROM0
+INCLUDE "inc/hardware.inc"
 
-tile_player_top:
-    DB $18,$18, $00,$3C, $3C,$66, $7E,$81
-    DB $7E,$99, $00,$7E, $81,$7E, $81,$7E
+SECTION "GFX Tiles (ROM)", ROM0
 
-tile_player_bottom:
-    DB $00,$7E, $00,$7E, $00,$66, $00,$66
-    DB $00,$66, $66,$66, $E7,$E7, $00,$00
+DEF TILE_CHIP_IDX       EQU $F5   
+DEF TILE_X_IDX          EQU $F6   
 
-tile_bg_blank:
-    DB $00,$00,$00,$00,$00,$00,$00,$00
-    DB $00,$00,$00,$00,$00,$00,$00,$00
+TileData:
+  REPT 8
+    db $00, $00
+  ENDR
+  REPT 8
+    db %10101010, %01010101
+  ENDR
+TileDataEnd:
+
+SpriteTile:
+  db %00011000,%00011000
+  db %00011000,%00011000
+  db %11111111,%11111111
+  db %00011000,%00011000
+  db %00011000,%00011000
+  db %00011000,%00011000
+  db %00000000,%00000000
+  db %00000000,%00000000
+SpriteTileEnd:
+
+TileChip::
+    db $24,$00,$7E,$5A,$C3,$18,$42,$7E
+    db $42,$7E,$C3,$18,$7E,$5A,$24,$00
+TileChipEnd::
+
+TileX::
+   db $81,$81,$42,$42,$24,$24,$18,$18
+  db $18,$18,$24,$24,$42,$42,$81,$81
+TileXEnd::
+
+EXPORT Gfx_LoadTiles
+Gfx_LoadTiles:
+  ld de, TileData
+  ld hl, $8000
+  ld bc, TileDataEnd - TileData
+  call CopyBytes
+
+  ld de, SpriteTile
+  ld hl, $8000 + (2*16)
+  ld bc, SpriteTileEnd - SpriteTile
+  call CopyBytes
+
+  ld de, TileChip
+  ld hl, $8000 + (TILE_CHIP_IDX*16)
+  ld bc, TileChipEnd - TileChip
+  call CopyBytes
+
+  ld de, TileX
+  ld hl, $8000 + (TILE_X_IDX*16)
+  ld bc, TileXEnd - TileX
+  call CopyBytes
+  ret
