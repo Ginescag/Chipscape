@@ -120,3 +120,6 @@ SECTION "Header", ROM0[$100]
    ;;    rgbfix will calculate it
    db $00, $00 ;; Padding placeholders. Could be any values. They will be overwritten.
                ;; If different from 0, a warning will be issued when overwritten
+
+SECTION "INT TIMER", ROM0[$0050]
+    jp Timer_ISR
