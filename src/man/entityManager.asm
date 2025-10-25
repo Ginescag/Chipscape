@@ -16,6 +16,7 @@ component_physics:: DS CMP_ARR_BYTES
                     
 SECTION "Entity Manager Code", ROM0
 
+;; INIT ALL ARRAYS TO 00
 man_entity_init::
     ;;WRITE SENTINEL
     ld a, CMP_SENTINEL
@@ -36,6 +37,11 @@ man_entity_init::
     ld b, CMP_ARR_BYTES
     xor a
     call memset_256 
+
+    ld hl, component_physics
+    ld b, CMP_ARR_BYTES
+    xor a
+    call memset_256
 ret
 
 ;;HL -> dir del primer hueco libre en el array de entidades
@@ -57,6 +63,8 @@ man_entity_alloc::
     ld [hl], CMP_RESERVE
 ret
 
+
+;;LD HL, CHANGE_VEL 
 ;; input HL -> direccion de la rutina de procesamiento
 man_entity_for_each::
     ld de, components

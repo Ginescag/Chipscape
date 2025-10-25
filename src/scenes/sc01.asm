@@ -28,39 +28,66 @@ sc01_init::
   ;; INIT ENTITIES
   call man_entity_alloc ;;C000
 
-  ld d, CMP_SPRITE_H
+  ld d, CMP_INFO_H
   ld e, l
-  ld hl, (sc01_entity1+0)
+  ld hl, sc01_entity1+0
   ld b, CMP_SIZE
   push de
   call memcpy
-  
-  pop de
-  ld d, CMP_PHYSICS_H
-  ld hl, (sc01_entity1+4)
-  ld b, CMP_SIZE
-  call memcpy
-  
-  call man_entity_alloc ;;C000
 
+  pop de
   ld d, CMP_SPRITE_H
-  ld e, l
-  ld hl, (sc01_entity2+0)
+  ld hl, sc01_entity1+4
   ld b, CMP_SIZE
   push de
   call memcpy
   
   pop de
   ld d, CMP_PHYSICS_H
-  ld hl, (sc01_entity2+4)
+  ld hl, sc01_entity1+8
   ld b, CMP_SIZE
   call memcpy
+  
+  call man_entity_alloc ;;C004
+  ld d, CMP_INFO_H
+  ld e, l
+  ld hl, sc01_entity2+0
+  ld b, CMP_SIZE
+  push de
+  call memcpy
+
+  pop de
+  ld d, CMP_SPRITE_H
+  ld hl, sc01_entity2+4
+  ld b, CMP_SIZE
+  push de
+  call memcpy
+  
+  pop de
+  ld d, CMP_PHYSICS_H
+  ld hl, sc01_entity2+8
+  ld b, CMP_SIZE
+  call memcpy
+
+  ; ld d, CMP_SPRITE_H
+  ; ld e, l
+  ; ld hl, (sc01_entity2+0)
+  ; ld b, CMP_SIZE
+  ; push de
+  ; call memcpy
+  
+  ; pop de
+  ; ld d, CMP_PHYSICS_H
+  ; ld hl, (sc01_entity2+4)
+  ; ld b, CMP_SIZE
+  ; call memcpy
 ret
 
 
 ;; BUCLE PRINCIPAL DE LA PANTALLA QUE VOY A JUGAR
 sc01_run::
   .loop:
+  call sys_player_update
   call sys_physics_update
   call wait_vblank
   call man_entity_draw
