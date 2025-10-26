@@ -42,7 +42,12 @@ sc01_init::
   ld d, CMP_PHYSICS_H
   ld hl, sc01_entity1+8
   ld b, CMP_SIZE
+  push de                 ;;ESTO SIRVE PARA LUEGO OBTENER LAS VELOCIDADES DEL JUGADOR
   call memcpy
+
+  pop de                  ;;OBTENEMOS PHYSICS DEL PERSONAJE
+  call get_player_speed   ;;esta llamada solo hay q hacerla cuando cargas el primer split de la entidad del personaje
+   
   
   call man_entity_alloc ;;C004
 
