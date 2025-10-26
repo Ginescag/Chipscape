@@ -120,3 +120,22 @@ SECTION "Header", ROM0[$100]
    ;;    rgbfix will calculate it
    db $00, $00 ;; Padding placeholders. Could be any values. They will be overwritten.
                ;; If different from 0, a warning will be issued when overwritten
+
+SECTION "ISR VBlank", ROM0[$0040]
+    reti
+
+; LCD STAT
+SECTION "ISR LCDSTAT", ROM0[$0048]
+    reti
+
+; TIMER (1/16s -> flag cada 1s). Encaminamos al Timer_ISR del módulo.
+SECTION "ISR TIMER", ROM0[$0050]
+    jp Timer_ISR
+
+; SERIAL
+SECTION "ISR SERIAL", ROM0[$0058]
+    reti
+
+; JOYPAD
+SECTION "ISR JOYPAD", ROM0[$0060]
+    reti

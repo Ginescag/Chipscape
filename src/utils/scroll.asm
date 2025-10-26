@@ -261,7 +261,6 @@ Scroll_Tick::
     or   b
     ret  z
 
-    ;desplazar TODOS los sprites en -DX / -DY
     call scroll_shift_all_sprites
     ret
 

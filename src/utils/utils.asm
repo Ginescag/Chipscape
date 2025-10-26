@@ -12,7 +12,6 @@ ret
 
 enciende_pantalla::
     di
-    ; Opción A: encender manteniendo lo que hubiese
     ld  a, [rLCDC]
     set  7, a                 ; bit7 = 1 (LCD ON)
     ld [rLCDC], a

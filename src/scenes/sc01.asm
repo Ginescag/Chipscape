@@ -69,14 +69,18 @@ sc01_init::
 
 ret
 
-
 sc01_run::
-.loop:
-  call sys_player_update
-  call sys_physics_update
-  call Scroll_Tick
+  .loop:
+    call sys_player_update
+    call sys_physics_update
+    call Scroll_Tick
+    call wait_vblank
 
-  call wait_vblank
-  call man_entity_draw
-  jr .loop
-ret
+    call HUD_Tick
+    call wait_vblank
+    call HUD_Draw    
+    call wait_vblank
+       
+    call man_entity_draw    
+    jr .loop
+  ret
