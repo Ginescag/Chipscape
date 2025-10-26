@@ -4,7 +4,6 @@ SECTION "Scene 01 code", ROM0
 
 ;; INIT METE TILES Y PALETA Y DEMAS
 sc01_init::
-
   call wait_vblank
   ld hl, FLATLINE_front0
   ld de, VRAM_TILEDATA_START + $1A * VRAM_TILE_SIZE
@@ -25,7 +24,7 @@ sc01_init::
 
   call man_entity_init
 
-  ;; INIT ENTITIES
+  ;; INIT ENTITIES PREGUNTAR AL PROFESOR
   call man_entity_alloc ;;C000
 
   ld d, CMP_INFO_H
@@ -49,6 +48,7 @@ sc01_init::
   call memcpy
   
   call man_entity_alloc ;;C004
+
   ld d, CMP_INFO_H
   ld e, l
   ld hl, sc01_entity2+0
@@ -69,18 +69,6 @@ sc01_init::
   ld b, CMP_SIZE
   call memcpy
 
-  ; ld d, CMP_SPRITE_H
-  ; ld e, l
-  ; ld hl, (sc01_entity2+0)
-  ; ld b, CMP_SIZE
-  ; push de
-  ; call memcpy
-  
-  ; pop de
-  ; ld d, CMP_PHYSICS_H
-  ; ld hl, (sc01_entity2+4)
-  ; ld b, CMP_SIZE
-  ; call memcpy
 ret
 
 
@@ -92,4 +80,34 @@ sc01_run::
   call wait_vblank
   call man_entity_draw
   jr .loop
+ret
+
+
+entity_load_from_label::
+  push hl
+
+  call man_entity_alloc
+  ld d, CMP_INFO_H
+  ld e, l
+  pop hl
+  ld b, CMP_SIZE
+  push de
+  call memcpy
+
+  pop de
+  ld d, CMP_SPRITE_H
+  ld bc, $0004        ;;PARA PASAR AL SIGUIETNE APARTADO DE LA ENTIDAD DECLARADA
+  add hl, bc
+  ld b, CMP_SIZE
+  push de
+  call memcpy
+
+  pop de
+  ld d, CMP_PHYSICS_H
+  ld bc, $0004        ;;PARA PASAR AL SIGUIETNE APARTADO DE LA ENTIDAD DECLARADA
+  add hl, bc
+  ld b, CMP_SIZE
+  push de
+  call memcpy
+
 ret

@@ -28,6 +28,13 @@ memcpy::
     jr nz, memcpy
 ret
 
+memcpy_65535::
+    ld a, [hl+]
+    ld [de], a
+    inc de
+    dec bc
+    jr nz, memcpy
+
 wait_vblank::
     ld hl, rLY
     ld a, VBLANK_ST
