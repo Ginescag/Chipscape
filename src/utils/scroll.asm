@@ -1,29 +1,28 @@
 INCLUDE "constantes.inc"
 
+
 DEF SCR_W           EQU 160
 DEF SCR_H           EQU 144
 
 DEF MAP_W           EQU 256
 DEF MAP_H           EQU 256
 
-DEF SCX_MAX         EQU (MAP_W - SCR_W) ; 96
-DEF SCY_MAX         EQU (MAP_H - SCR_H) ; 112
+DEF SCX_MAX         EQU (MAP_W - SCR_W) 
+DEF SCY_MAX         EQU (MAP_H - SCR_H) 
 
-DEF SCX_INIT        EQU ((MAP_W/2) - (SCR_W/2)) ; 48
-DEF SCY_INIT        EQU ((MAP_H/2) - (SCR_H/2)) ; 56
+DEF SCX_INIT        EQU ((MAP_W/2) - (SCR_W/2)) 
+DEF SCY_INIT        EQU ((MAP_H/2) - (SCR_H/2)) 
 
-;Danger zone 
+
 DEF DZ_LEFT         EQU 32
 DEF DZ_RIGHT        EQU 32
 DEF DZ_TOP          EQU 32
 DEF DZ_BOTTOM       EQU 32
 
-DEF RIGHT_LIMIT     EQU (SCR_W - DZ_RIGHT)     ; 128
-DEF BOTTOM_LIMIT    EQU (SCR_H - DZ_BOTTOM)    ; 112
+DEF RIGHT_LIMIT     EQU (SCR_W - DZ_RIGHT)     
+DEF BOTTOM_LIMIT    EQU (SCR_H - DZ_BOTTOM)    
 
-; -------------------------
-; WRAM
-; -------------------------
+
 SECTION "WRAM Scroll", WRAM0
 wCamX:               ds 1
 wCamY:               ds 1
@@ -31,7 +30,7 @@ wScroll_PlayerE:     ds 1
 wPX:                 ds 1   
 wPY:                 ds 1   
 wVX:                 ds 1   
-wVY:                 ds 1  
+wVY:                 ds 1   
 wFZ:                 ds 1   
 wDX:                 ds 1   
 wDY:                 ds 1   
@@ -143,21 +142,22 @@ Scroll_Tick::
     ld  [wDX], a
     ld  [wDY], a
 
+    ; X axis
     ld   a, [wFZ]
-    bit  0, a                 
+    bit  0, a                
     jr   z, .x_right
     ld   a, [wVX]             
     bit  7, a
     jr   z, .x_right
-    ld   a, $FF               
+    ld   a, $FF              
     ld  [wDX], a
     jr   .y_axis
 
 .x_right:
     ld   a, [wFZ]
-    bit  1, a                
+    bit  1, a                 
     jr   z, .y_axis
-    ld   a, [wVX]             
+    ld   a, [wVX]            
     bit  7, a
     jr   nz, .y_axis
     or   a                    
@@ -166,37 +166,40 @@ Scroll_Tick::
     ld  [wDX], a
 
 .y_axis:
+    ; Y axis
     ld   a, [wFZ]
     bit  2, a                 
     jr   z, .y_bottom
-    ld   a, [wVY]             
+    ld   a, [wVY]            
     bit  7, a
     jr   z, .y_bottom
-    ld   a, $FF               
+    ld   a, $FF              
     ld  [wDY], a
     jr   .apply_cam
 
 .y_bottom:
     ld   a, [wFZ]
-    bit  3, a                
+    bit  3, a                 
     jr   z, .apply_cam
     ld   a, [wVY]             
     bit  7, a
     jr   nz, .apply_cam
     or   a
     jr   z, .apply_cam
-    ld   a, 1                 
+    ld   a, 1                 ; dy = +1 (abajo)
     ld  [wDY], a
 
 .apply_cam:
+    ; X
     ld   a, [wDX]
     or   a
     jr   z, .no_cam_x
     cp   $FF
     jr   nz, .cam_x_pos
+    ; dx = -1
     ld   a, [wCamX]
     or   a
-    jr   z, .x_cancel         
+    jr   z, .x_cancel         ; ya en 0 -> no se aplica
     dec  a
     ld  [wCamX], a
     ld  [rSCX], a
@@ -204,6 +207,7 @@ Scroll_Tick::
     ld  [wDX], a
     jr   .no_cam_x
 .cam_x_pos:
+    ; dx = +1
     ld   a, [wCamX]
     cp   SCX_MAX
     jr   z, .x_cancel
@@ -218,11 +222,13 @@ Scroll_Tick::
     ld  [wDX], a
 .no_cam_x:
 
+    ; Y
     ld   a, [wDY]
     or   a
     jr   z, .no_cam_y
     cp   $FF
     jr   nz, .cam_y_pos
+    ; dy = -1
     ld   a, [wCamY]
     or   a
     jr   z, .y_cancel
@@ -233,6 +239,7 @@ Scroll_Tick::
     ld  [wDY], a
     jr   .no_cam_y
 .cam_y_pos:
+    ; dy = +1
     ld   a, [wCamY]
     cp   SCY_MAX
     jr   z, .y_cancel
@@ -247,12 +254,14 @@ Scroll_Tick::
     ld  [wDY], a
 .no_cam_y:
 
+    ; Si no hubo ningún scroll aplicado, salir
     ld   a, [wDX]
     ld   b, a
     ld   a, [wDY]
     or   b
     ret  z
 
+    ;desplazar TODOS los sprites en -DX / -DY
     call scroll_shift_all_sprites
     ret
 
@@ -276,6 +285,7 @@ scroll_find_player::
     bit  T_PLAYER, a
     jr   z, .next
 
+    ; encontrado: E
     ld   a, e
     ld  [wScroll_PlayerE], a
     ret
@@ -293,13 +303,12 @@ scroll_find_player::
     ld  [wScroll_PlayerE], a
     ret
 
-
 scroll_shift_all_sprites::
     ld   de, components
     ld   a, [wDX]
-    ld   b, a                
+    ld   b, a                ; b = dx aplicado
     ld   a, [wDY]
-    ld   c, a                
+    ld   c, a                ; c = dy aplicado
 .shift_loop:
     ld   a, [de]
     cp   CMP_SENTINEL
@@ -308,6 +317,7 @@ scroll_shift_all_sprites::
     bit  CMP_INFO_BIT_ALIVE, a
     jr   z, .next
 
+    ; X -= dx
     ld   h, CMP_SPRITE_H
     ld   l, e
     ld   a, l
@@ -321,6 +331,7 @@ scroll_shift_all_sprites::
     ld  [hl], a
 .no_x:
 
+    ; Y -= dy
     ld   h, CMP_SPRITE_H
     ld   l, e
     ld   a, l

@@ -22,7 +22,6 @@ sc01_init::
 
   call man_entity_init
 
-  ;; INIT ENTITIES
   call man_entity_alloc ;;C000
 
   ld d, CMP_INFO_H
