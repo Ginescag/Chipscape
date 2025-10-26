@@ -1,0 +1,939 @@
+; ----------------------------------------------------------------------------
+; main.asm — BG + jugador + cámara + TIMER en SPRITES (HUD arriba-dcha)
+;  + SCORE centrado arriba (sprites): "SCORE" (fila 1) y 5 dígitos (fila 2)
+;  + SCORE y dígitos en NEGRO usando paleta OBP1 (bit4=1 en flags de sprites)
+;  - NO usa WINDOW -> no tapa el BG
+;  - OAM limpio antes de encender LCD
+;  - Tiles BG/Sprites en $8000 (LCDC bit4=1)
+;  - Usa timer.asm (Timer_LoadTiles, Timer_SetSecsHL, Timer_Init, Timer_HUD_*)
+;  - Dead-zone con CLAMP inmediato (permite scroll diagonal desde cualquier punto)
+; ----------------------------------------------------------------------------
+
+; -------------------- Registros HW --------------------
+DEF rP1    EQU $FF00
+DEF rDIV   EQU $FF04
+DEF rTIMA  EQU $FF05
+DEF rTMA   EQU $FF06
+DEF rTAC   EQU $FF07
+DEF rIF    EQU $FF0F
+DEF rLCDC  EQU $FF40
+DEF rSCY   EQU $FF42
+DEF rSCX   EQU $FF43
+DEF rLY    EQU $FF44
+DEF rBGP   EQU $FF47
+DEF rOBP0  EQU $FF48
+DEF rOBP1  EQU $FF49   ; << nueva paleta de sprites para SCORE (negro)
+DEF rDMA   EQU $FF46
+DEF rIE    EQU $FFFF
+
+; -------------------- Flags LCDC/IE -------------------
+DEF LCDCF_BGON       EQU %00000001
+DEF LCDCF_OBJON      EQU %00000010
+DEF LCDCF_TILE8000   EQU %00010000
+DEF LCDCF_ON         EQU %10000000
+DEF IEF_TIMER        EQU %00000100
+
+; -------------------- Constantes pantalla -------------
+DEF SCR_W  EQU 160
+DEF SCR_H  EQU 144
+DEF SPR_W  EQU 8
+DEF SPR_H  EQU 8
+
+; Márgenes scroll (dead-zone)
+DEF H_MARGIN  EQU 16
+DEF V_MARGIN  EQU 16
+DEF LEFT_LIMIT   EQU H_MARGIN
+DEF RIGHT_LIMIT  EQU (SCR_W - SPR_W - H_MARGIN)
+DEF TOP_LIMIT    EQU V_MARGIN
+DEF BOTTOM_LIMIT EQU (SCR_H - SPR_H - V_MARGIN)
+
+DEF SPEED EQU 1
+
+; -------------------- HUD SCORE (sprites) --------------
+; Tiles en VRAM (tile indices relativos a $8000)
+DEF SCORE_LABEL_TILE_BASE  EQU 32     ; 5 tiles: S,C,O,R,E
+DEF SCORE_DIGIT_TILE_BASE  EQU 48     ; 10 tiles: 0..9
+
+; OAM layout
+DEF TIMER_SPRITES_FIRST    EQU 1      ; (timer usa #1..#3)
+DEF SCORE_LABEL_OAM_BASE   EQU 4      ; #4..#8
+DEF SCORE_DIGIT_OAM_BASE   EQU 9      ; #9..#13
+
+DEF SCORE_LABEL_LEN        EQU 5
+DEF SCORE_DIGIT_COUNT      EQU 5
+
+; Posiciones en pantalla (OAM usa X+8, Y+16 internamente)
+DEF SCORE_LABEL_Y_OAM      EQU 16     ; fila superior (como el timer)
+DEF SCORE_DIGIT_Y_OAM      EQU 24     ; fila inferior
+; centrado: 5 * 8px = 40px -> (160-40)/2 = 60 -> OAM X = 60 + 8 = 68
+DEF SCORE_X0_OAM           EQU 68
+
+; Límite de puntuación a 5 dígitos
+DEF SCORE_MAX_LO           EQU $9F    ; 99999 = $01 86 9F
+DEF SCORE_MAX_MID          EQU $86
+DEF SCORE_MAX_HI           EQU $01
+
+; -------------------- Joypad --------------------------
+DEF P1F_GET_BTN  EQU $10
+DEF P1F_GET_DPAD EQU $20
+DEF P1F_GET_NONE EQU $30
+; 1 = pulsado
+DEF PADF_RIGHT EQU %00000001
+DEF PADF_LEFT  EQU %00000010
+DEF PADF_UP    EQU %00000100
+DEF PADF_DOWN  EQU %00001000
+
+; ----------------- Vectores de interrupción -----------
+SECTION "ISR VBlank", ROM0[$0040]
+  reti
+SECTION "ISR STAT",   ROM0[$0048]
+  reti
+SECTION "ISR Timer",  ROM0[$0050]
+  jp Timer_ISR              ; << definido en timer.asm
+SECTION "ISR Serial", ROM0[$0058]
+  reti
+SECTION "ISR Joypad", ROM0[$0060]
+  reti
+
+; -------------------- GFX/Tiles (no incluye dígitos del timer) --
+SECTION "GFX", ROM0
+
+; 2 tiles de fondo (rayas) -> $8000: tiles #0 y #1
+TileData:
+  REPT 8
+    db $00, $00
+  ENDR
+  REPT 8
+    db %10101010, %01010101
+  ENDR
+TileDataEnd:
+
+; 1 tile del jugador -> tile #2 (@ $8000 + 2*16)
+SpriteTile:
+  db %00011000,$00
+  db %00011000,$00
+  db %11111111,$00
+  db %00011000,$00
+  db %00011000,$00
+  db %00011000,$00
+  db %00000000,$00
+  db %00000000,$00
+SpriteTileEnd:
+
+; --- Fuente mínima para HUD SCORE (5 letras + 10 dígitos), 1bpp (plane1=0) ---
+; Letras: S, C, O, R, E
+ScoreLettersTiles:
+; 'S'
+  db %00111100,$00
+  db %01000010,$00
+  db %01000000,$00
+  db %00111100,$00
+  db %00000010,$00
+  db %00000010,$00
+  db %01000010,$00
+  db %00111100,$00
+; 'C'
+  db %00111100,$00
+  db %01000010,$00
+  db %01000000,$00
+  db %01000000,$00
+  db %01000000,$00
+  db %01000000,$00
+  db %01000010,$00
+  db %00111100,$00
+; 'O'
+  db %00111100,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %00111100,$00
+; 'R'
+  db %01111100,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01111100,$00
+  db %01001000,$00
+  db %01000100,$00
+  db %01000010,$00
+  db %01000010,$00
+; 'E'
+  db %01111110,$00
+  db %01000000,$00
+  db %01000000,$00
+  db %01111100,$00
+  db %01000000,$00
+  db %01000000,$00
+  db %01000000,$00
+  db %01111110,$00
+ScoreLettersTilesEnd:
+
+; Dígitos 0..9
+ScoreDigitTiles:
+; 0
+  db %00111100,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %00111100,$00
+; 1
+  db %00011000,$00
+  db %00101000,$00
+  db %00001000,$00
+  db %00001000,$00
+  db %00001000,$00
+  db %00001000,$00
+  db %00001000,$00
+  db %00111100,$00
+; 2
+  db %00111100,$00
+  db %01000010,$00
+  db %00000010,$00
+  db %00000100,$00
+  db %00001000,$00
+  db %00010000,$00
+  db %00100000,$00
+  db %01111110,$00
+; 3
+  db %00111100,$00
+  db %01000010,$00
+  db %00000010,$00
+  db %00011100,$00
+  db %00000010,$00
+  db %00000010,$00
+  db %01000010,$00
+  db %00111100,$00
+; 4
+  db %00000100,$00
+  db %00001100,$00
+  db %00010100,$00
+  db %00100100,$00
+  db %01000100,$00
+  db %01111110,$00
+  db %00000100,$00
+  db %00000100,$00
+; 5
+  db %01111110,$00
+  db %01000000,$00
+  db %01000000,$00
+  db %01111100,$00
+  db %00000010,$00
+  db %00000010,$00
+  db %01000010,$00
+  db %00111100,$00
+; 6
+  db %00111100,$00
+  db %01000000,$00
+  db %01000000,$00
+  db %01111100,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %00111100,$00
+; 7
+  db %01111110,$00
+  db %00000010,$00
+  db %00000100,$00
+  db %00001000,$00
+  db %00010000,$00
+  db %00100000,$00
+  db %00100000,$00
+  db %00100000,$00
+; 8
+  db %00111100,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %00111100,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %00111100,$00
+; 9
+  db %00111100,$00
+  db %01000010,$00
+  db %01000010,$00
+  db %00111110,$00
+  db %00000010,$00
+  db %00000010,$00
+  db %01000010,$00
+  db %00111100,$00
+ScoreDigitTilesEnd:
+
+; Tilemap BG 32x32 alternando 0/1 -> $9800
+TileMap:
+  REPT 32
+    REPT 16
+      db 0, 1
+    ENDR
+  ENDR
+TileMapEnd:
+
+; -------------------- Variables propias ----------------
+SECTION "WRAM Vars (main)", WRAM0
+wCameraX:   ds 1
+wCameraY:   ds 1
+wPlayerX:   ds 1
+wPlayerY:   ds 1
+wCurKeys:   ds 1
+wPrevKeys:  ds 1
+
+; Puntuación 24-bit: 0..99999 (saturado)
+wScoreLo:   ds 1
+wScoreMid:  ds 1
+wScoreHi:   ds 1
+
+; temporales para conversión a decimal
+wTmpLo:     ds 1
+wTmpMid:    ds 1
+wTmpHi:     ds 1
+
+; -------------------- Código --------------------------
+SECTION "Main", ROM0
+
+main::
+  di
+  ld sp, $FFFE
+
+  ; Paletas
+  ld a, %11100100
+  ld [rBGP], a           ; BG (igual que antes)
+  ld [rOBP0], a          ; Sprites OBP0 (timer/jugador como tenías)
+  ; OBP1: color1 -> negro (11), color0->blanco (00), color2->oscuro (10), color3->negro (11)
+  ld a, %11101100        ; 0xEC : idx1 = negro -> nuestras fuentes 1bpp salen en negro
+  ld [rOBP1], a
+
+  ; Apagar LCD mientras cargamos VRAM
+  ld a, [rLCDC]
+  res 7, a
+  ld [rLCDC], a
+
+  ; ===== Cargar VRAM en $8000 =====
+  ; BG tiles #0,#1
+  ld de, TileData
+  ld hl, $8000
+  ld bc, TileDataEnd - TileData
+  call CopyBytes
+
+  ; Sprite jugador #2
+  ld de, SpriteTile
+  ld hl, $8000 + (2*16)
+  ld bc, SpriteTileEnd - SpriteTile
+  call CopyBytes
+
+  ; Dígitos 0..9 del timer (externo)
+  call Timer_LoadTiles
+
+  ; Tiles del HUD SCORE (letras + dígitos propios)
+  call Score_LoadTiles
+
+  ; Tilemap BG -> $9800
+  ld de, TileMap
+  ld hl, $9800
+  ld bc, TileMapEnd - TileMap
+  call CopyBytes
+
+  ; ===== Estado inicial =====
+  xor a
+  ld [wCameraX], a
+  ld [wCameraY], a
+  ld a, 80
+  ld [wPlayerX], a
+  ld a, 72
+  ld [wPlayerY], a
+
+  xor a
+  ld [wCurKeys], a
+  ld [wPrevKeys], a
+
+  ; Puntuación = 0
+  call Score_Clear
+    ld b, 0        ; 1000 = $03E8
+  ld c, 232
+  call Score_AddBC
+  ; ===== Timer: valor inicial + HW =====
+  ld hl, 120                 ; 120 s ejemplo
+  call Timer_SetSecsHL
+  call Timer_Init
+
+  ; ===== OAM =====
+  call ClearOAM
+
+  ; FE00: jugador (LCD off, ok)
+  ld hl, $FE00
+  ld a, 72 + 16      ; Y
+  ld [hli], a
+  ld a, 80 + 8       ; X
+  ld [hli], a
+  ld a, 2            ; tile
+  ld [hli], a
+  xor a              ; flags (OBP0)
+  ld [hli], a
+
+  ; HUD del timer
+  call Timer_HUD_Init
+  
+  ; Encender LCD: BG + Sprites, tiles $8000
+  ld a, LCDCF_ON | LCDCF_OBJON | LCDCF_BGON | LCDCF_TILE8000
+  ld [rLCDC], a
+  ; (SCORE se dibuja cada frame en Score_HUD_Update)
+    
+  ei
+
+; =================== Bucle principal ===================
+MainLoop:
+  ; 1) Lógica/Entrada
+  call UpdateKeys
+
+  ; Movimiento jugador
+  ld a, [wCurKeys]
+  and PADF_RIGHT
+  jr z, .noRight
+    ld hl, wPlayerX
+    inc [hl]
+  .noRight:
+
+  ld a, [wCurKeys]
+  and PADF_LEFT
+  jr z, .noLeft
+    ld hl, wPlayerX
+    dec [hl]
+  .noLeft:
+
+  ld a, [wCurKeys]
+  and PADF_UP
+  jr z, .noUp
+    ld hl, wPlayerY
+    dec [hl]
+  .noUp:
+
+  ld a, [wCurKeys]
+  and PADF_DOWN
+  jr z, .noDown
+    ld hl, wPlayerY
+    inc [hl]
+  .noDown:
+
+  ; --------- Cámara con márgenes (dead-zone, clamp inmediato) ---------
+  ; X
+  ld a, [wPlayerX]
+  ld b, a
+  ld a, [wCameraX]
+  ld c, a
+  ld a, b
+  sub c
+  cp RIGHT_LIMIT
+  jr c, .chkLeftX
+  jr z, .chkLeftX
+    ld a, b
+    sub RIGHT_LIMIT
+    ld [wCameraX], a
+    jr .doneX
+.chkLeftX:
+  cp LEFT_LIMIT
+  jr nc, .doneX
+    ld a, b
+    sub LEFT_LIMIT
+    ld [wCameraX], a
+.doneX:
+  ; Y
+  ld a, [wPlayerY]
+  ld b, a
+  ld a, [wCameraY]
+  ld c, a
+  ld a, b
+  sub c
+  cp BOTTOM_LIMIT
+  jr c, .chkTopY
+  jr z, .chkTopY
+    ld a, b
+    sub BOTTOM_LIMIT
+    ld [wCameraY], a
+    jr .doneY
+.chkTopY:
+  cp TOP_LIMIT
+  jr nc, .doneY
+    ld a, b
+    sub TOP_LIMIT
+    ld [wCameraY], a
+.doneY:
+
+  ; --- Esperar VBlank para tocar PPU ---
+  call WaitVBlank
+
+  ; 2) Timer: tick de 1s
+  ld a, [wTimerFlag1s]
+  or a
+  jr z, .no1s
+    xor a
+    ld [wTimerFlag1s], a
+    ld a, [wTimerHi]
+    ld h, a
+    ld a, [wTimerLo]
+    ld l, a
+    ld a, h
+    or l
+    jr z, .no1s_dec
+      dec hl
+      ld a, l
+      ld [wTimerLo], a
+      ld a, h
+      ld [wTimerHi], a
+      call Timer_ComputeDigits
+    .no1s_dec:
+  .no1s:
+
+  ; 3) COMMIT a HW (dentro de VBlank)
+  ; Scroll
+  ld a, [wCameraY]
+  ld [rSCY], a
+  ld a, [wCameraX]
+  ld [rSCX], a
+
+  ; OAM: jugador (sprite #0)
+  ld hl, $FE00
+  ; Y
+  ld a, [wCameraY]
+  ld c, a
+  ld a, [wPlayerY]
+  sub c
+  add 16
+  ld [hli], a
+  ; X
+  ld a, [wCameraX]
+  ld c, a
+  ld a, [wPlayerX]
+  sub c
+  add 8
+  ld [hli], a
+  ; tile / flags
+  ld a, 2
+  ld [hli], a
+  xor a
+  ld [hli], a
+
+  ; Limpiar OAM desde #1 (timer y score se reescriben abajo)
+  ld b, 1
+  call HideSpritesFromB
+
+  ; HUD del timer (sprites #1..#3) - sigue usando OBP0 (flags=0)
+  call Timer_HUD_Update
+
+  ; HUD SCORE (label + dígitos) usando OBP1 (flags=$10)
+  call Score_HUD_Update
+
+  jp MainLoop
+
+; =================== RUTINAS SCORE =====================
+
+; Carga tiles de SCORE (letras y dígitos) en VRAM $8000
+Score_LoadTiles:
+  ; Letras SCORE -> base 32 (5 tiles)
+  ld de, ScoreLettersTiles
+  ld hl, $8000 + (SCORE_LABEL_TILE_BASE * 16)
+  ld bc, ScoreLettersTilesEnd - ScoreLettersTiles
+  call CopyBytes
+  ; Dígitos 0..9 -> base 48 (10 tiles)
+  ld de, ScoreDigitTiles
+  ld hl, $8000 + (SCORE_DIGIT_TILE_BASE * 16)
+  ld bc, ScoreDigitTilesEnd - ScoreDigitTiles
+  call CopyBytes
+  ret
+
+; Poner puntuación a 0
+Score_Clear:
+  xor a
+  ld [wScoreLo], a
+  ld [wScoreMid], a
+  ld [wScoreHi], a
+  ret
+
+; Añadir BC (16-bit) a la puntuación (24-bit), saturando a 99999
+; Entrada: BC = valor a sumar
+Score_AddBC:
+  ; sum low
+  ld a, [wScoreLo]
+  add c
+  ld [wScoreLo], a
+  ; sum mid + carry
+  ld a, [wScoreMid]
+  adc b
+  ld [wScoreMid], a
+  ; sum hi + carry
+  ld a, [wScoreHi]
+  adc 0
+  ld [wScoreHi], a
+
+  ; clamp a 99999 ($01 86 9F)
+  ld a, [wScoreHi]
+  cp SCORE_MAX_HI
+  jr c, .ok
+  jr z, .eq_hi
+  jr .clamp
+.eq_hi:
+  ld a, [wScoreMid]
+  cp SCORE_MAX_MID
+  jr c, .ok
+  jr z, .eq_mid
+  jr .clamp
+.eq_mid:
+  ld a, [wScoreLo]
+  cp SCORE_MAX_LO
+  jr c, .ok
+  jr z, .ok
+  jr .clamp
+.ok:
+  ret
+.clamp:
+  ld a, SCORE_MAX_LO
+  ld [wScoreLo], a
+  ld a, SCORE_MAX_MID
+  ld [wScoreMid], a
+  ld a, SCORE_MAX_HI
+  ld [wScoreHi], a
+  ret
+
+; Dibuja HUD: "SCORE" centrado (fila superior) + 5 dígitos (fila inferior)
+; Usa OBP1 para que salgan en NEGRO (flags=$10)
+Score_HUD_Update:
+  ; ----- label "SCORE" en sprites #4..#8 -----
+  ld hl, $FE00 + (SCORE_LABEL_OAM_BASE*4) ; base OAM para la etiqueta
+  ld d, SCORE_X0_OAM                       ; D = X corriente
+
+  ; 'S'
+  ld a, SCORE_LABEL_Y_OAM
+  ld [hli], a
+  ld a, d
+  ld [hli], a
+  ld a, SCORE_LABEL_TILE_BASE + 0
+  ld [hli], a
+  ld a, $10              ; flags: usar OBP1 (negro)
+  ld [hli], a
+  ld a, d
+  add 8
+  ld d, a
+  ; 'C'
+  ld a, SCORE_LABEL_Y_OAM
+  ld [hli], a
+  ld a, d
+  ld [hli], a
+  ld a, SCORE_LABEL_TILE_BASE + 1
+  ld [hli], a
+  ld a, $10
+  ld [hli], a
+  ld a, d
+  add 8
+  ld d, a
+  ; 'O'
+  ld a, SCORE_LABEL_Y_OAM
+  ld [hli], a
+  ld a, d
+  ld [hli], a
+  ld a, SCORE_LABEL_TILE_BASE + 2
+  ld [hli], a
+  ld a, $10
+  ld [hli], a
+  ld a, d
+  add 8
+  ld d, a
+  ; 'R'
+  ld a, SCORE_LABEL_Y_OAM
+  ld [hli], a
+  ld a, d
+  ld [hli], a
+  ld a, SCORE_LABEL_TILE_BASE + 3
+  ld [hli], a
+  ld a, $10
+  ld [hli], a
+  ld a, d
+  add 8
+  ld d, a
+  ; 'E'
+  ld a, SCORE_LABEL_Y_OAM
+  ld [hli], a
+  ld a, d
+  ld [hli], a
+  ld a, SCORE_LABEL_TILE_BASE + 4
+  ld [hli], a
+  ld a, $10
+  ld [hli], a
+
+  ; ----- convertir puntuación (24-bit) a 5 dígitos y dibujarlos -----
+  ; Copiar a temporales
+  ld a, [wScoreLo]
+  ld [wTmpLo], a
+  ld a, [wScoreMid]
+  ld [wTmpMid], a
+  ld a, [wScoreHi]
+  ld [wTmpHi], a
+
+  ; Base OAM para dígitos
+  ld hl, $FE00 + (SCORE_DIGIT_OAM_BASE*4)
+  ld d, SCORE_X0_OAM
+
+  ; Dígito decenas de millar (10000)
+  call Score_TmpDiv10000_WriteDigit
+  ; Dígito millares (1000)
+  call Score_TmpDiv1000_WriteDigit
+  ; Dígito centenas (100)
+  call Score_TmpDiv100_WriteDigit
+  ; Dígito decenas (10)
+  call Score_TmpDiv10_WriteDigit
+  ; Dígito unidades (resto 0..9)
+  ld a, [wTmpLo]
+  call Score_WriteNextDigit
+  ret
+
+; ---- helpers de conversión (restan y escriben un sprite por dígito) ----
+; Entrada común para Score_WriteNextDigit:
+;  - A = valor del dígito (0..9)
+;  - (HL) apunta al Y del siguiente sprite de dígito
+;  - D = X actual; la rutina avanzará HL (+4) y D (+8)
+;  - Flags del sprite = $10 (OBP1)
+
+Score_WriteNextDigit:
+  push af
+  ; Y
+  ld a, SCORE_DIGIT_Y_OAM
+  ld [hli], a
+  ; X
+  ld a, d
+  ld [hli], a
+  ; tile = base + dígito
+  pop af
+  add SCORE_DIGIT_TILE_BASE
+  ld [hli], a
+  ld a, $10          ; paleta OBP1 -> negro
+  ld [hli], a
+  ; avanzar X
+  ld a, d
+  add 8
+  ld d, a
+  ret
+
+; tmp >= 10000 ? resta hasta <10000, A=conteo (0..9), y escribe
+Score_TmpDiv10000_WriteDigit:
+  xor a               ; A = contador
+.td10k_loop:
+  ld b, a
+  ld a, [wTmpHi]
+  or a
+  jr nz, .ge_10k
+  ld a, [wTmpMid]
+  cp $27
+  jr c, .lt_10k
+  jr nz, .ge_10k
+  ld a, [wTmpLo]
+  cp $10
+  jr c, .lt_10k
+.ge_10k:
+  ld a, [wTmpLo]
+  sub $10
+  ld [wTmpLo], a
+  ld a, [wTmpMid]
+  sbc $27
+  ld [wTmpMid], a
+  ld a, [wTmpHi]
+  sbc $00
+  ld [wTmpHi], a
+  ld a, b
+  inc a
+  jr .td10k_loop
+.lt_10k:
+  call Score_WriteNextDigit
+  ret
+
+; tmp >= 1000 ? ...
+Score_TmpDiv1000_WriteDigit:
+  xor a
+.td1k_loop:
+  ld b, a
+  ld a, [wTmpHi]
+  or a
+  jr nz, .ge_1k
+  ld a, [wTmpMid]
+  cp $03
+  jr c, .lt_1k
+  jr nz, .ge_1k
+  ld a, [wTmpLo]
+  cp $E8
+  jr c, .lt_1k
+.ge_1k:
+  ld a, [wTmpLo]
+  sub $E8
+  ld [wTmpLo], a
+  ld a, [wTmpMid]
+  sbc $03
+  ld [wTmpMid], a
+  ld a, [wTmpHi]
+  sbc $00
+  ld [wTmpHi], a
+  ld a, b
+  inc a
+  jr .td1k_loop
+.lt_1k:
+  call Score_WriteNextDigit
+  ret
+
+; tmp >= 100 ? ...
+Score_TmpDiv100_WriteDigit:
+  xor a
+.td100_loop:
+  ld b, a
+  ld a, [wTmpHi]
+  or a
+  jr nz, .ge_100
+  ld a, [wTmpMid]
+  cp $00
+  jr nz, .ge_100
+  ld a, [wTmpLo]
+  cp $64
+  jr c, .lt_100
+.ge_100:
+  ld a, [wTmpLo]
+  sub $64
+  ld [wTmpLo], a
+  ld a, [wTmpMid]
+  sbc $00
+  ld [wTmpMid], a
+  ld a, [wTmpHi]
+  sbc $00
+  ld [wTmpHi], a
+  ld a, b
+  inc a
+  jr .td100_loop
+.lt_100:
+  call Score_WriteNextDigit
+  ret
+
+; tmp >= 10 ? ...
+Score_TmpDiv10_WriteDigit:
+  xor a
+.td10_loop:
+  ld b, a
+  ld a, [wTmpHi]
+  or a
+  jr nz, .ge_10
+  ld a, [wTmpMid]
+  or a
+  jr nz, .ge_10
+  ld a, [wTmpLo]
+  cp $0A
+  jr c, .lt_10
+.ge_10:
+  ld a, [wTmpLo]
+  sub $0A
+  ld [wTmpLo], a
+  ld a, [wTmpMid]
+  sbc $00
+  ld [wTmpMid], a
+  ld a, [wTmpHi]
+  sbc $00
+  ld [wTmpHi], a
+  ld a, b
+  inc a
+  jr .td10_loop
+.lt_10:
+  call Score_WriteNextDigit
+  ret
+
+; =================== Utilidades (main) ===================
+
+; Copiar BC bytes de [DE] a [HL]
+CopyBytes:
+  ld a, b
+  or c
+  ret z
+.cb_loop:
+  ld a, [de]
+  ld [hl], a
+  inc de
+  inc hl
+  dec bc
+  ld a, b
+  or c
+  jr nz, .cb_loop
+  ret
+
+; Esperar a VBlank (LY >= 144)
+WaitVBlank:
+.wvb:
+  ld a, [rLY]
+  cp 144
+  jr c, .wvb
+  ret
+
+; Limpiar todo el OAM (40*4 bytes = 160)
+ClearOAM:
+  ld hl, $FE00
+  ld bc, 40*4
+  xor a
+.co_loop:
+  ld [hl+], a
+  dec bc
+  ld a, b
+  or c
+  jr nz, .co_loop
+  ret
+
+; Oculta sprites #B..#39 poniendo Y=0 (offscreen)
+; Entrada: B = índice inicial (0..39)
+HideSpritesFromB:
+  ; HL = $FE00 + B*4
+  ld a, b
+  add a
+  add a
+  ld l, a
+  ld h, HIGH($FE00)
+  ; C = número de sprites a ocultar = 40 - B
+  ld a, 40
+  sub b
+  ld c, a
+  ld de, 4
+  xor a               ; A=0 (Y=0 -> offscreen)
+.hus_loop:
+  ld [hl], a
+  add hl, de
+  dec c
+  jr nz, .hus_loop
+  ret
+
+; Lectura de Joypad -> wCurKeys (1=pulsado)
+UpdateKeys:
+  ld a, [wCurKeys]
+  ld [wPrevKeys], a
+
+  ; Botones (A,B,Select,Start)
+  ld a, P1F_GET_BTN
+  ldh [rP1], a
+  call .settle
+  ldh a, [rP1]
+  or $F0
+  cpl
+  and $0F
+  ld b, a
+
+  ; D-Pad
+  ld a, P1F_GET_DPAD
+  ldh [rP1], a
+  call .settle
+  ldh a, [rP1]
+  or $F0
+  cpl
+  and $0F
+  ld [wCurKeys], a
+
+  ; liberar
+  ld a, P1F_GET_NONE
+  ldh [rP1], a
+  ret
+
+.settle:
+  ldh a, [rP1]
+  ldh a, [rP1]
+  ldh a, [rP1]
+  ret
