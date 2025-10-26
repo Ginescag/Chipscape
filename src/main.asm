@@ -6,9 +6,10 @@ main::
 
   call game_engine_init
   call sc01_init
+  call HUD_Init
   call sc01_run
 
 
 
-  di     ;; Disable Interrupts
+  di    
   halt 

@@ -171,7 +171,7 @@ MiB_left_run::
     DB $E0,$E0,$C0,$C0,$C0,$C0,$E0,$E0
     DB $F0,$90,$E0,$E0,$E0,$E0,$60,$60
 
-Cientifico:front::
+Cientifico_front::
     DB $07,$07,$0F,$08,$17,$18,$1F,$10
     DB $3F,$30,$7F,$5F,$7D,$4B,$6F,$5F
     DB $3F,$30,$7E,$69,$FF,$97,$FF,$93
@@ -333,7 +333,7 @@ chipS4::
 
 
 Chip_normal::
-    Chip_normal::
+    Chip_n::
     DB $24,$00,$7E,$5A,$C3,$18,$42,$7E
     DB $42,$7E,$C3,$18,$7E,$5A,$24,$00
     Chip_bright_1::
