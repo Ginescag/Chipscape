@@ -1,5 +1,7 @@
 SECTION "sprites", ROM0 
 ;;;;;;;;;;;PERSONAJE PRINCIPAL;;;;;;;;;;;;;;;
+
+SPRITES_START::
 FLATLINE_front0::
     DB $30,$3F,$0F,$1F,$0D,$1D,$02,$12
     DB $0E,$1E,$0F,$1F,$0F,$1F,$00,$1F
@@ -348,3 +350,4 @@ Chip_normal::
     Chip_bright_4::
     DB $24,$00,$7E,$5A,$C3,$18,$42,$7E
     DB $02,$1E,$C3,$08,$6E,$4A,$24,$00
+SPRITES_END::

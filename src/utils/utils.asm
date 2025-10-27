@@ -28,11 +28,18 @@ memcpy::
 ret
 
 memcpy_65535::
-    ld a, [hl+]
-    ld [de], a
-    inc de
-    dec bc
-    jr nz, memcpy
+    ld   a,b
+    or   c
+    ret  z
+.loop:
+    ld   a,[hl+]
+    ld  [de],a
+    inc  de
+    dec  bc
+    ld   a,b
+    or   c
+    jr  nz,.loop
+ret
 
 wait_vblank::
     ld hl, rLY

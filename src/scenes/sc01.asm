@@ -3,17 +3,29 @@ INCLUDE "constantes.inc"
 SECTION "Scene 01 code", ROM0
 
 sc01_init::
-  call wait_vblank
-  ld hl, FLATLINE_front0
-  ld de, VRAM_TILEDATA_START + $1A * VRAM_TILE_SIZE
-  ld b, 64
-  call memcpy
 
-  call wait_vblank
-  ld hl, FLATLINE_front1
-  ld de, VRAM_TILEDATA_START + $1E * VRAM_TILE_SIZE
-  ld b, 64
-  call memcpy
+  call apaga_pantalla
+  ; HL = inicio de datos
+  ld   hl, SPRITES_START
+  ; DE = $8000 + $1A * 16
+  ld   de, VRAM_TILEDATA_START + $1A * VRAM_TILE_SIZE
+  ; BC = tamaño total (bytes)
+  ld   bc, SPRITES_END - SPRITES_START
+
+  call memcpy_65535
+
+  call enciende_pantalla
+  ; call wait_vblank
+  ; ld hl, FLATLINE_front0
+  ; ld de, VRAM_TILEDATA_START + $1A * VRAM_TILE_SIZE
+  ; ld b, 64
+  ; call memcpy
+
+  ; call wait_vblank
+  ; ld hl, FLATLINE_front1
+  ; ld de, VRAM_TILEDATA_START + $1E * VRAM_TILE_SIZE
+  ; ld b, 64
+  ; call memcpy
 
   ld   a, %11100100
   ld  [rOBP0], a
