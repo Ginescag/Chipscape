@@ -1,5 +1,4 @@
 INCLUDE "constantes.inc"
-
 SECTION "Scene 01 code", ROM0
 
 sc01_init::
@@ -13,7 +12,22 @@ sc01_init::
   ld   bc, SPRITES_END - SPRITES_START
 
   call memcpy_65535
+  
+  ld hl, TilesTotal
+  ld de, $8000+ $80 *VRAM_TILE_SIZE
+  ld bc, TilesTotalEnd - TilesTotal
 
+  call memcpy_65535
+
+
+  ld hl , Mapa1
+  ld de, $9800
+
+ 
+  ld bc,mapa1fin-Mapa1
+  call cargar_mapa
+
+  call set_hud
   call enciende_pantalla
   ; call wait_vblank
   ; ld hl, FLATLINE_front0

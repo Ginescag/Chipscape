@@ -88,7 +88,6 @@ wTileOnes:        ds 1
 SECTION "Timer Code", ROM0
 
 Timer_LoadTiles:
-  call wait_vblank
   ld hl, DigitsTiles
   ld de, VRAM_TILEDATA_START + DIGIT_TILE_BASE*VRAM_TILE_SIZE
   ld b, DigitsTilesEnd - DigitsTiles

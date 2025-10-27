@@ -12,32 +12,25 @@ SECTION "HUD code", ROM0
 
 
 HUD_Init::
-    call wait_vblank
+    call apaga_pantalla
     call Score_LoadTiles
-    call wait_vblank
     call Timer_LoadTiles
-    call wait_vblank
     call ChipCount_LoadTiles
 
-    call wait_vblank
     call HUD_ClearRows
 
-    call wait_vblank
+    
     call Score_Reset
     call ChipCount_Reset
 
-    call wait_vblank
     ld   hl, HUD_TIMER_START_SECS
     call Timer_SetSecsHL
 
-    call wait_vblank
+    
     call Score_HUD_Init
-    call wait_vblank
     call ChipCount_HUD_Init
-    call wait_vblank
     call Timer_HUD_Init
-    call wait_vblank
-    ld   a, 0
+    ld   a, 128
     ld  [rWY], a
     ld   a, 7
     ld  [rWX], a
@@ -45,8 +38,8 @@ HUD_Init::
     set  6, a                    
     set  5, a                    
     ld  [rLCDC], a
-    call wait_vblank
     call Timer_Init
+    call enciende_pantalla
     ei
     ret
 
@@ -85,7 +78,6 @@ HUD_Draw::
 
 
 HUD_ClearRows:
-    call wait_vblank
 
     ld   a, HUD_BLANK_TILE
 
