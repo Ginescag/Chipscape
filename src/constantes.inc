@@ -3,6 +3,10 @@
 ;;CONSTANTES BASICAS GENERALES
 ;;========================================================================
 ;;========================================================================
+
+
+
+
 DEF rLY                 equ $FF44
 DEF VBLANK_ST           equ 144
 DEF VRAM_TILEDATA_START equ $8000
@@ -120,3 +124,7 @@ DEF CMP_FREE        EQU $00 ;;ESTO ES PARA SABER SI LA ENTIDAD ESTA MUERTA O NO
 DEF CMP_RESERVE     EQU (1 << CMP_INFO_BIT_ALIVE)
 
 
+
+;colisiones
+DEF TILEF_SOLID   EQU %00000001
+DEF TILEF_MASK    EQU %00000001

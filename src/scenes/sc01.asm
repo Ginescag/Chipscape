@@ -107,7 +107,7 @@ sc01_run::
     call sys_physics_update
     call Scroll_Tick
     call wait_vblank
-
+    
     call HUD_Tick
     call wait_vblank
     call HUD_Draw    

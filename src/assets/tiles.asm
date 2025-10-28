@@ -1,4 +1,5 @@
 SECTION "Tiles", ROM0
+INCLUDE "constantes.inc"
 
 tile_player_top::
     DB $18,$18, $00,$3C, $3C,$66, $7E,$81
@@ -270,3 +271,76 @@ DB $FF,$FF,$00,$00,$00,$00,$FF,$00
 TilesTotalEnd::
 
     ; End of TILES_TOTAL.Z80
+SECTION "Tile Flags Table", ROM0
+
+; ----------------- Macros de construcción -----------------
+; Índice actual dentro de la tabla mientras la vamos “construyendo”
+DEF __tff_idx__ = 0
+
+; TFF_FILL_TO end_idx, value
+; Emite (end_idx - __tff_idx__ + 1) bytes con 'value' y avanza __tff_idx__
+MACRO TFF_FILL_TO
+    DEF __tff_cnt__ = (\1 - __tff_idx__ + 1)
+    REPT __tff_cnt__
+        DB \2
+    ENDR
+    DEF __tff_idx__ = \1 + 1
+ENDM
+
+; TFF_SKIP_TO end_idx  → rellena con 0 (aire) hasta 'end_idx' inclusive
+MACRO TFF_SKIP_TO
+    TFF_FILL_TO \1, 0
+ENDM
+
+; TFF_RANGE start,end,value  → rellena aire hasta start-1, y [start..end] con 'value'
+MACRO TFF_RANGE
+    IF __tff_idx__ > \1
+        FAIL "TFF_RANGE fuera de orden: start < índice actual"
+    ENDC
+    IF \2 < \1
+        FAIL "TFF_RANGE: end < start"
+    ENDC
+    IF __tff_idx__ < \1
+        TFF_SKIP_TO (\1 - 1)
+    ENDC
+    TFF_FILL_TO \2, \3
+ENDM
+
+; ----------------- Tabla final (256 bytes) -----------------
+; Byte N de esta tabla = flags del tile ID N del BG
+TileFlagsTable::
+    ; Aire hasta $83
+    TFF_SKIP_TO $83
+
+    ; Sólidos que nos pasaste (hex):
+    ; $84..$A7
+    TFF_RANGE $84, $A7, TILEF_SOLID
+    ; $A9
+    TFF_RANGE $A9, $A9, TILEF_SOLID
+    ; $AB
+    TFF_RANGE $AB, $AB, TILEF_SOLID
+    ; $AD
+    TFF_RANGE $AD, $AD, TILEF_SOLID
+    ; $AF
+    TFF_RANGE $AF, $AF, TILEF_SOLID
+    ; $B0..$BE
+    TFF_RANGE $B0, $BE, TILEF_SOLID
+    ; $C0,$C1
+    TFF_RANGE $C0, $C1, TILEF_SOLID
+    ; $C3,$C4
+    TFF_RANGE $C3, $C4, TILEF_SOLID
+    ; $C6,$C7
+    TFF_RANGE $C6, $C7, TILEF_SOLID
+    ; $C9..$CC
+    TFF_RANGE $C9, $CC, TILEF_SOLID
+    ; $CE
+    TFF_RANGE $CE, $CE, TILEF_SOLID
+    ; $D1
+    TFF_RANGE $D1, $D1, TILEF_SOLID
+    ; $D3
+    TFF_RANGE $D3, $D3, TILEF_SOLID
+
+    ; Completar hasta $FF con aire si faltan bytes
+    IF __tff_idx__ <= $FF
+        TFF_SKIP_TO $FF
+    ENDC
