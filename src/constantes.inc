@@ -13,6 +13,11 @@ def SPRITES_TOTAL       equ 40*4    ;bytes
 def rLCDC               equ $FF40
 def PANTALLA_WIDTH      equ 32
 
+DEF VRAM_SPRITENC_START_POS     EQU $1A
+DEF VRAM_TILES_START_POS        EQU $80
+DEF VRAM_SPRITE_CHIP_START_POS  EQU $C3
+DEF VRAM_GO_POS                 EQU $DA
+
 DEF rP1   EQU $FF00
 DEF rSCY  EQU $FF42
 DEF rSCX  EQU $FF43
@@ -110,7 +115,7 @@ DEF CMP_INFO_BIT_MOVABLE     = 1
 DEF CMP_INFO_BIT_COLISION    = 0
 
 
-DEF NUM_ENTITIES    EQU 10
+DEF NUM_ENTITIES    EQU 20
 DEF CMP_ARR_BYTES   EQU NUM_ENTITIES * CMP_SIZE
 DEF CMP_INFO_H      EQU $C0
 DEF CMP_SPRITE_H    EQU $C1
@@ -119,4 +124,47 @@ DEF CMP_SENTINEL    EQU $FF
 DEF CMP_FREE        EQU $00 ;;ESTO ES PARA SABER SI LA ENTIDAD ESTA MUERTA O NO
 DEF CMP_RESERVE     EQU (1 << CMP_INFO_BIT_ALIVE)
 
+;;TILES DEL PERSONAJE PRINCIPAL
+                            ;;TILES COMPLEMENTARIOS PARA LA ANIMACION
+DEF TILE_FL_Dl = $1A        ;;$1E 
+DEF TILE_FL_Dr = $1C        ;;$20
 
+DEF TILE_FL_Ll = $22        ;;$26
+DEF TILE_FL_Lr = $24        ;;$28
+
+DEF TILE_FL_Rl = $2A        ;;$2E
+DEF TILE_FL_Rr = $2C        ;;$30
+
+DEF TILE_FL_Ul = $32        ;;$36
+DEF TILE_FL_UR = $34        ;;$38
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+DEF TILE_MIB_Dl = $3E        ;;$42 
+DEF TILE_MIB_Dr = $40        ;;$44
+
+DEF TILE_MIB_Ll = $5A        ;;$5E
+DEF TILE_MIB_Lr = $5C        ;;$60
+
+DEF TILE_MIB_Rl = $52        ;;$56
+DEF TILE_MIB_Rr = $54        ;;$58
+
+DEF TILE_MIB_Ul = $4A        ;;$4E
+DEF TILE_MIB_Ur = $4C        ;;$50
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+DEF TILE_BC_Dl = $66        ;;$6A 
+DEF TILE_BC_Dr = $68        ;;$6C
+
+DEF TILE_BC_Ll = $7A        ;;$7E
+DEF TILE_BC_Lr = $7C        ;;$80
+
+DEF TILE_BC_Rl = $82        ;;$86
+DEF TILE_BC_Rr = $84        ;;$88
+
+DEF TILE_BC_Ul = $72        ;;$76
+DEF TILE_BC_Ur = $74        ;;$78
+
+DEF ENTITY_TEMPLATE_STRIDE EQU (CMP_SIZE*3)

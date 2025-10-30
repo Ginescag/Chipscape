@@ -17,14 +17,6 @@ enciende_pantalla::
     ld [rLCDC], a
     ei
 ret
-set_hud::
- di
-    ld  a, [rLCDC]
-    set  6, a                 ; bit7 = 1 (LCD ON)
-    ;set 3 ,a
-    ld [rLCDC], a
-    ei
-ret
 
 ;; HL = "source", DE = "Destiny" B = counter
 memcpy::
@@ -47,6 +39,37 @@ memcpy_65535::
     ld   a,b
     or   c
     jr  nz,.loop
+ret
+
+set_hud::
+    di 
+    ld a, [rLCDC]
+    set 6, a
+    ld [rLCDC], a
+    ei 
+ret
+
+
+;; HL = src (mapa)
+;; DE = dst (VRAM)
+;; BC = contador (bytes a copiar)
+cargar_mapa::
+    .loop:
+    ld a, [hl+]      ; leer byte de mapa
+
+    push hl
+    ld h, d
+    ld l, e
+    ld [hl+], a      ; escribir y avanzar destino
+
+    push hl
+    pop de           ; DE = destino avanzado
+    pop hl           ; restaurar src
+
+    dec bc
+    ld a, b
+    or c             ; Z=1 si BC==0
+    jr nz, .loop
 ret
 
 wait_vblank::
@@ -89,39 +112,15 @@ memset_256::
     jr nz, memset_256
 ret
 
-;; HL = src (mapa)
-;; DE = dst (VRAM)
-;; BC = contador (bytes a copiar)
-cargar_mapa::
-.loop:
-    ld a, [hl+]      ; leer byte de mapa
-
-    push hl
-    ld h, d
-    ld l, e
-    ld [hl+], a      ; escribir y avanzar destino
-
-    push hl
-    pop de           ; DE = destino avanzado
-    pop hl           ; restaurar src
-
-    dec bc
-    ld a, b
-    or c             ; Z=1 si BC==0
-    jr nz, .loop
-    ret
-
-
-
-
 memset_65535::
-.loop:
+    .loop:
     ld [hl+], a
     dec bc
     ld a, b
     or c
     jr nz, .loop
-    ret
+ret
+
 BORRAR_OAM::
     ld hl, OAM_START
     ld b, SPRITES_TOTAL

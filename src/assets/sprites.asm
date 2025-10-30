@@ -91,6 +91,7 @@ MiB_front::
     DB $FE,$7E,$FE,$FA,$FE,$72,$7C,$84
     DB $F8,$18,$F8,$F8,$FC,$7C,$FE,$7E
     DB $FE,$F2,$7C,$F0,$F8,$F8,$78,$78
+
 MiB_down_run1::
     DB $0F,$0F,$1F,$1F,$1F,$1B,$3F,$31
     DB $7F,$7E,$7F,$5F,$7F,$4E,$7E,$61
@@ -263,8 +264,9 @@ Cientifico_right_run::
     DB $F8,$08,$F8,$08,$F8,$F8,$E8,$58
     DB $F8,$78,$F8,$08,$D0,$30,$E0,$E0
     DB $E0,$E0,$3C,$FC,$F8,$F8,$70,$70
+SPRITES_END::
 
-
+SPRITES_START_CHIPS::
 chipSpecial1::
     chipS1TLE0::
     DB $42,$42,$66,$7E,$00,$3C,$66,$18
@@ -350,4 +352,4 @@ Chip_normal::
     Chip_bright_4::
     DB $24,$00,$7E,$5A,$C3,$18,$42,$7E
     DB $02,$1E,$C3,$08,$6E,$4A,$24,$00
-SPRITES_END::
+SPRITES_END_CHIPS::
