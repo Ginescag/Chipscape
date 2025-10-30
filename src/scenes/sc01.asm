@@ -165,7 +165,7 @@ sc01_init::
   call set_entities_count
 
   call Scroll_Init
-
+  call Interact_Init
 ret
 
 sc01_run::
@@ -177,7 +177,7 @@ sc01_run::
     call sys_anim_enemies_update
     call Scroll_Tick
     call wait_vblank
-
+    call Interact_Tick
     call HUD_Tick
     call wait_vblank
     call HUD_Draw 
