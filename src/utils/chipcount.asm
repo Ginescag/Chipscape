@@ -1,26 +1,7 @@
-
 INCLUDE "constantes.inc"
 
-DEF TILE_CHIP_IDX     EQU $F5      ; icono de chip
-DEF TILE_X_IDX        EQU $F6      ; letra 'X'
-
-DEF CHIPS_DIGIT_BASE  EQU 4
-
-DEF WIN_MAP_BASE      EQU $9C00
-DEF CHIPS_ROW         EQU 1
-DEF CHIP_X_ICON       EQU 2
-DEF CHIP_X_LETTER     EQU 3
-DEF CHIP_X_TENS       EQU 4
-DEF CHIP_X_ONES       EQU 5
-
-DEF CHIP_ADDR_ICON    EQU (WIN_MAP_BASE + CHIPS_ROW*32 + CHIP_X_ICON)
-DEF CHIP_ADDR_X       EQU (WIN_MAP_BASE + CHIPS_ROW*32 + CHIP_X_LETTER)
-DEF CHIP_ADDR_TENS    EQU (WIN_MAP_BASE + CHIPS_ROW*32 + CHIP_X_TENS)
-DEF CHIP_ADDR_ONES    EQU (WIN_MAP_BASE + CHIPS_ROW*32 + CHIP_X_ONES)
-
-
 SECTION "WRAM CHIPS", WRAM0
-wChips:           ds 1            
+wChips:           ds 1
 
 SECTION "GFX CHIPCOUNT", ROM0
 ChipIconTile:
@@ -29,7 +10,6 @@ ChipIconTile:
 LetterXTile:
   db $00,$00,$42,$42,$24,$24,$18,$18,$18,$18,$24,$24,$42,$42,$00,$00
 
-
 SECTION "ChipCount Code", ROM0
 
 ChipCount_LoadTiles:
@@ -37,7 +17,6 @@ ChipCount_LoadTiles:
   ld de, VRAM_TILEDATA_START + TILE_CHIP_IDX * VRAM_TILE_SIZE
   ld b, 16
   call memcpy
-  ; 'X'
   ld hl, LetterXTile
   ld de, VRAM_TILEDATA_START + TILE_X_IDX * VRAM_TILE_SIZE
   ld b, 16
@@ -58,28 +37,72 @@ ChipCount_SetA:
   ret
 
 ChipCount_AddA:
-  ld c, a
-  ld hl, wChips
-  ld a, [hl]
-  add c
-  jr c, .sat
-  cp 100
-  jr c, .store
+  ld   c, a
+  ld   hl, wChips
+  ld   a, [hl]
+  ld   d, a
+  add  c
+  jr   c, .sat
+  cp   100
+  jr   c, .ok_sum
 .sat:
-  ld a, 99
-.store:
-  ld [hl], a
-  ret
+  ld   a, 99
+.ok_sum:
+  ld   [hl], a
+  sub  d
+  ret  z
+  push af
+  ld   h, 0
+  ld   l, a
+  add  hl, hl
+  ld   d, h
+  ld   e, l
+  ld   h, 0
+  ld   l, a
+  add  hl, hl
+  add  hl, hl
+  add  hl, hl
+  add  hl, hl
+  ld   b, h
+  ld   c, l
+  ld   h, 0
+  ld   l, a
+  add  hl, hl
+  add  hl, hl
+  add  hl, hl
+  add  hl, hl
+  add  hl, hl
+  add  hl, bc
+  add  hl, de
+  ld   b, h
+  ld   c, l
+  call Score_AddBC
+  pop  af
+  ld   h, 0
+  ld   l, a
+  add  hl, hl
+  ld   d, h
+  ld   e, l
+  ld   h, 0
+  ld   l, a
+  add  hl, hl
+  add  hl, hl
+  add  hl, hl
+  add  hl, de
+  ld   a, [wTimerHi]
+  ld   d, a
+  ld   a, [wTimerLo]
+  ld   e, a
+  add  hl, de
+  jp   Timer_SetSecsHL
 
 ChipCount_HUD_Init:
   ld hl, CHIP_ADDR_ICON
   ld a, TILE_CHIP_IDX
   ld [hl], a
-  ; 'X'
   ld hl, CHIP_ADDR_X
   ld a, TILE_X_IDX
   ld [hl], a
-  ; 00
   ld hl, CHIP_ADDR_TENS
   ld a, CHIPS_DIGIT_BASE + 0
   ld [hl], a
@@ -98,12 +121,12 @@ ChipCount_HUD_Update:
   jr .c10
 .done10:
   ld hl, CHIP_ADDR_TENS
-  ld c, a                 ; unidades
+  ld c, a
   ld a, CHIPS_DIGIT_BASE
   add b
-  ld [hl], a              ; decenas
+  ld [hl], a
   inc l
   ld a, CHIPS_DIGIT_BASE
   add c
-  ld [hl], a              
+  ld [hl], a
   ret

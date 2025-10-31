@@ -1,62 +1,11 @@
 INCLUDE "constantes.inc"
 
-SECTION "Scene Helper", ROM0 
-
-set_entity::
-  push hl               ;;ETQ DE LA ENTIDAD
-  call man_entity_alloc ;;HL = DIR DEL ARRAY DE ENTIDADES
-
-  ld d, CMP_INFO_H
-  ld e, l
-
-  pop hl
-
-  ld b, CMP_SIZE
-  push de
-  push hl
-  call memcpy
-
-  pop hl 
-  pop de
-  push hl
-  ld a, l
-  add CMP_SIZE
-  ld l, a
-
-  ld d, CMP_SPRITE_H
-  ld b, CMP_SIZE
-  push de
-  call memcpy
-  
-  pop de
-  pop hl 
-  ld a, l
-  add CMP_SIZE
-  add CMP_SIZE
-  ld l, a
-
-  ld d, CMP_PHYSICS_H
-  ld b, CMP_SIZE
-  call memcpy
-ret
-
-set_entities_count::
-  .loop
-      push bc
-      push hl
-      call set_entity
-      pop  hl
-      ld   de, ENTITY_TEMPLATE_STRIDE
-      add  hl, de
-      pop  bc
-      dec  b
-      jr   nz, .loop
-      ret
-
-SECTION "Scene 01 code", ROM0
 
 
-sc01_init::
+SECTION "Scene 02 code", ROM0
+
+
+sc02_init::
 
   call apaga_pantalla
 
@@ -85,12 +34,11 @@ sc01_init::
     call memcpy_65535
 
     ;;CARGAMOS EL MAPA AL TILEMAP
-  ld hl, Mapa1
+  ld hl, mapa2
   ld de, $9800
-  ld bc, Mapa1fin - Mapa1
+  ld bc, mapa2fin - mapa2
   call cargar_mapa
 
-  ;;añadimos a la pantalla el hud
   call set_hud
 
   call enciende_pantalla
@@ -101,12 +49,10 @@ sc01_init::
   ld  [rBGP],  a
 
   call man_entity_init
-  call patrol_global_init
 
 
 
-
-  call man_entity_alloc ;;C000
+  call man_entity_alloc 
 
   ld d, CMP_INFO_H
   ld e, l
@@ -156,7 +102,6 @@ sc01_init::
   call memcpy
 
 
-
   ld  hl, sc01_entities_REST
   ld  b, (sc01_entities_REST_END - sc01_entities_REST) / (CMP_SIZE*3)
   call set_entities_count
@@ -166,19 +111,15 @@ sc01_init::
 
 ret
 
-sc01_run::
+sc02_run::
   .loop:
     call sys_player_update
-    call patrol_global_tick
-
     call sys_physics_update
     
     ld de, $C000              ;;magic exagerada posicion en el array de entidades del personaje
     call animacion_personaje
     call sys_anim_enemies_update
     call Scroll_Tick
-    call ChipPickup_Tick
-
     call Interact_Tick
     call HUD_Tick
     call wait_vblank

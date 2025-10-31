@@ -1,79 +1,4 @@
-
 INCLUDE "constantes.inc"
-
-IF !DEF(rDIV)
-  DEF rDIV  EQU $FF04
-ENDC
-IF !DEF(rTIMA)
-  DEF rTIMA EQU $FF05
-ENDC
-IF !DEF(rTMA)
-  DEF rTMA  EQU $FF06
-ENDC
-IF !DEF(rTAC)
-  DEF rTAC  EQU $FF07
-ENDC
-IF !DEF(rIF)
-  DEF rIF   EQU $FF0F
-ENDC
-IF !DEF(rIE)
-  DEF rIE   EQU $FFFF
-ENDC
-
-IF !DEF(IEF_TIMER)
-  DEF IEF_TIMER  EQU %00000100
-ENDC
-DEF TACF_EN    EQU %00000100
-DEF TACF_4KHZ  EQU %00000000
-DEF TICKS_PER_SECOND   EQU 16          
-
-IF !DEF(DIGIT_TILE_BASE)
-  DEF DIGIT_TILE_BASE    EQU 4
-ENDC
-IF !DEF(HUD_BLANK_TILE)
-  DEF HUD_BLANK_TILE     EQU $EF
-ENDC
-IF !DEF(WIN_MAP_BASE)
-  DEF WIN_MAP_BASE       EQU $9C00
-ENDC
-IF !DEF(HUD_ROW_DIGITS)
-  DEF HUD_ROW_DIGITS     EQU 1
-ENDC
-
-DEF TIMER_X_H          EQU 17
-DEF TIMER_X_T          EQU 18
-DEF TIMER_X_O          EQU 19
-DEF TIMER_ADDR_H       EQU (WIN_MAP_BASE + HUD_ROW_DIGITS*32 + TIMER_X_H)
-DEF TIMER_ADDR_T       EQU (WIN_MAP_BASE + HUD_ROW_DIGITS*32 + TIMER_X_T)
-DEF TIMER_ADDR_O       EQU (WIN_MAP_BASE + HUD_ROW_DIGITS*32 + TIMER_X_O)
-
-DEF TIMER_MAX_H        EQU 3
-DEF TIMER_MAX_L        EQU $E7        
-
-
-SECTION "GFX Digits (timer)", ROM0
-DigitsTiles:
- db $3C,$3C,$42,$42,$46,$46,$4A,$4A,$52,$52,$62,$62,$3C,$3C,$00,$00
- 
-  db $08,$08,$18,$18,$08,$08,$08,$08,$08,$08,$08,$08,$3E,$3E,$00,$00
-  
-  db $3C,$3C,$42,$42,$02,$02,$0C,$0C,$30,$30,$40,$40,$7E,$7E,$00,$00
-  
-  db $3C,$3C,$42,$42,$02,$02,$1C,$1C,$02,$02,$42,$42,$3C,$3C,$00,$00
-  
-  db $04,$04,$0C,$0C,$14,$14,$24,$24,$44,$44,$7E,$7E,$04,$04,$00,$00
-  
-  db $7E,$7E,$40,$40,$7C,$7C,$02,$02,$02,$02,$42,$42,$3C,$3C,$00,$00
-  
-  db $3C,$3C,$40,$40,$7C,$7C,$42,$42,$42,$42,$42,$42,$3C,$3C,$00,$00
-  
-  db $7E,$7E,$02,$02,$04,$04,$08,$08,$10,$10,$20,$20,$20,$20,$00,$00
-  
-  db $3C,$3C,$42,$42,$42,$42,$3C,$3C,$42,$42,$42,$42,$3C,$3C,$00,$00
-  
-  db $3C,$3C,$42,$42,$42,$42,$3E,$3E,$02,$02,$04,$04,$38,$38,$00,$00
-DigitsTilesEnd:
-
 
 SECTION "WRAM Vars (timer)", WRAM0
 wTimerLo:         ds 1
@@ -84,14 +9,10 @@ wTileHundreds:    ds 1
 wTileTens:        ds 1
 wTileOnes:        ds 1
 
-
 SECTION "Timer Code", ROM0
 
+
 Timer_LoadTiles:
-  ld hl, DigitsTiles
-  ld de, VRAM_TILEDATA_START + DIGIT_TILE_BASE*VRAM_TILE_SIZE
-  ld b, DigitsTilesEnd - DigitsTiles
-  call memcpy
   ret
 
 Timer_Init:
@@ -242,6 +163,7 @@ Timer_HUD_Update:
   ld [hl], a
   ret
 
+;genera “ticks” de 1/16 s y flag de 1s
 Timer_ISR:
   push af
   push hl

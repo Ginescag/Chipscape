@@ -180,3 +180,11 @@ sys_player_update::
     ld   hl, sys_player_update_one_entity
     call man_entity_for_each
 ret
+
+player_read_buttons::
+    ld   a, P1F_GET_BTN       ; seleccionar matriz de botones (A,B,Select,Start)
+    ld  [rP1], a
+    ld   a, [rP1]
+    cpl                       ; en GB 0=pulsado -> invertir a 1=pulsado
+    and  %00001111            ; aísla A,B,Select,Start
+    ret
