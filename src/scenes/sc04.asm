@@ -2,18 +2,18 @@ INCLUDE "constantes.inc"
 
 
 
-SECTION "Scene 02 code", ROM0
+SECTION "Scene 04 code", ROM0
 
 
-sc02_init::
+sc04_init::
 
   call apaga_pantalla
   call BORRAR_OAM
 
     ;;CARGAMOS EL MAPA AL TILEMAP
-  ld hl, mapa2
+  ld hl, mapa4
   ld de, $9800
-  ld bc, mapa2fin - mapa2
+  ld bc, mapa4fin - mapa4
   call cargar_mapa
 
   call set_hud
@@ -33,21 +33,21 @@ sc02_init::
 
   ld d, CMP_INFO_H
   ld e, l
-  ld hl, sc02_playerL+0
+  ld hl, sc04_playerL+0
   ld b, CMP_SIZE
   push de
   call memcpy
 
   pop de
   ld d, CMP_SPRITE_H
-  ld hl, sc02_playerL+4
+  ld hl, sc04_playerL+4
   ld b, CMP_SIZE
   push de
   call memcpy
   
   pop de
   ld d, CMP_PHYSICS_H
-  ld hl, sc02_playerL+8
+  ld hl, sc04_playerL+8
   ld b, CMP_SIZE
   push de                 ;;ESTO SIRVE PARA LUEGO OBTENER LAS VELOCIDADES DEL JUGADOR
   call memcpy
@@ -60,27 +60,27 @@ sc02_init::
 
   ld d, CMP_INFO_H
   ld e, l
-  ld hl, sc02_playerR+0
+  ld hl, sc04_playerR+0
   ld b, CMP_SIZE
   push de
   call memcpy
 
   pop de
   ld d, CMP_SPRITE_H
-  ld hl, sc02_playerR+4
+  ld hl, sc04_playerR+4
   ld b, CMP_SIZE
   push de
   call memcpy
   
   pop de
   ld d, CMP_PHYSICS_H
-  ld hl, sc02_playerR+8
+  ld hl, sc04_playerR+8
   ld b, CMP_SIZE
   call memcpy
 
 
-  ld  hl, sc02_entities_REST
-  ld  b, (sc02_entities_REST_END - sc02_entities_REST) / (CMP_SIZE*3)
+  ld  hl, sc04_entities_REST
+  ld  b, (sc04_entities_REST_END - sc04_entities_REST) / (CMP_SIZE*3)
   call set_entities_count
 
   call Scroll_Init
@@ -88,7 +88,7 @@ sc02_init::
 
 ret
 
-sc02_run::
+sc04_run::
   .loop:
     call sys_player_update
     call patrol_global_tick
@@ -101,7 +101,6 @@ sc02_run::
     call sys_anim_enemies_update
     call Scroll_Tick
     call ChipPickup_Tick
-
     call Interact_Tick
     call HUD_Tick
     call wait_vblank

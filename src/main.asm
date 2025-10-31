@@ -14,7 +14,14 @@ main::
 .escena3:
   call sc03_init
   call sc03_run
-
+  .escena4:
+  call sc04_init
+  call sc04_run
+  .escena5:
+  call sc05_init
+  call sc05_run
+.fin_gg:
+  call gg_animated
 
 
   di    

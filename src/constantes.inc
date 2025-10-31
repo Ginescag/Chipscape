@@ -185,7 +185,7 @@ DEF HUD_ROW_DIGITS   EQU 1
 ; ==============================
 DEF HUD_TIMER_START_SECS EQU 20
 DEF primera_escela       EQU 0
-
+DEF chp_timer_bonus EQU 5
 ; ==============================
 ; Timer HUD layout
 ; ==============================

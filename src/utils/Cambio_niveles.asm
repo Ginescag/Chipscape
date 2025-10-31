@@ -145,24 +145,21 @@ Interact_Tick::
 .noEdge:
     ret
 
-
 ia_read_buttons_nibble::
-    ld   a, $10                ; P15=0 (botones), P14=1
+    ld   a, $10                
     ld  [rP1], a
     ld   a, [rP1]
     cpl
     and  $0F
     ret
 
-; Devuelve Z=1 si A coincide con un tile interactivo ($95 o $97)
 ia_is_interact_tile::
     cp   $95
     ret  z
     cp   $97
     ret
 
-; Lee BG tile en (fila=B, col=C), base IA_BG_BASE
-; Devuelve A = tile#
+
 ia_read_bg_tile_at_BC::
     ; DE = fila*32
     ld   d, 0

@@ -100,6 +100,8 @@ sc03_run::
     call animacion_personaje
     call sys_anim_enemies_update
     call Scroll_Tick
+    call ChipPickup_Tick
+
     call Interact_Tick
     call HUD_Tick
     call wait_vblank

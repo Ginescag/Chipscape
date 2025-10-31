@@ -1,23 +1,22 @@
 INCLUDE "constantes.inc"
 
-SECTION "Game Over code", ROM0
+SECTION "GG code", ROM0
+
+DEF GG_SCX_MAX   EQU 96
 
 
-DEF GAMEOVER_SCX_MAX   EQU 96
+DEF GG_SLOW_B    EQU 8
+DEF GG_SLOW_C    EQU 2
 
-
-DEF GAMEOVER_SLOW_B    EQU 8
-DEF GAMEOVER_SLOW_C    EQU 2
-
-game_over_animated::
+gg_animated::
     ; --- LCD OFF y limpiar sprites/HUD ---
     call apaga_pantalla
     call BORRAR_OAM
 
     ; --- Cargar mapa GAME OVER en BGMap0 ($9800) ---
-    ld   hl, gameover_inic          ; <--- tus etiquetas de mapa
+    ld   hl, gg_inic          ; <--- tus etiquetas de mapa
     ld   de, $9800
-    ld   bc, gameover_fin - gameover_inic
+    ld   bc, gg_fin - gg_inic
     call cargar_mapa
 
     ; --- Posición inicial y paleta BG ---
@@ -36,10 +35,9 @@ game_over_animated::
     di
 
 .scroll_loop:
-    ; ===== Retardo "a cámara lenta": B*C frames por píxel =====
-    ld   b, GAMEOVER_SLOW_B
+    ld   b, GG_SLOW_B
 .delay_b:
-        ld   c, GAMEOVER_SLOW_C
+        ld   c, GG_SLOW_C
 .delay_c:
             call wait_vblank        ; espera 1 frame
             dec  c
@@ -49,7 +47,7 @@ game_over_animated::
 
     ; ===== Avanza 1 píxel cuando termina el retardo =====
     ld   a, [rSCX]
-    cp   GAMEOVER_SCX_MAX
+    cp   GG_SCX_MAX
     jr   nc, .freeze
     inc  a
     ld  [rSCX], a
