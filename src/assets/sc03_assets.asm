@@ -1,0 +1,56 @@
+include "constantes.inc"
+
+SECTION "scene 03 assets", ROM0
+
+sc03_entities::  ;;PYXp----
+sc03_playerL::   ;;INFO + SPRITE + PHYSICS
+    DB CMP_RESERVE, %01110101, %10000000, 03        ;;INFO
+    DB 80, 80, $1A, %00000000   ;;SPRITE
+    DB 80, 80, 03, 03          ;;PHYSICS
+
+sc03_playerR::
+    DB CMP_RESERVE, %01110101, %10000000, 03
+    DB 80, 88, $1C, %00000000
+    DB 80, 88, 03, 03
+
+sc03_entities_REST::
+sc03_MiB1_L::
+    DB CMP_RESERVE, %01110101, %01000000, 01
+    DB 16, 24, $3A, %00000000
+    DB 100, 100, 00, 00
+
+sc03_MiB1_R::
+    DB CMP_RESERVE, %01110101, %01000000, 01
+    DB 16, 32, $3C, %00000000
+    DB 100, 100, 00, 00
+
+sc03_MiB1_L2::
+    DB CMP_RESERVE, %01110101, %01000000, 01
+    DB 46, 50, $3A, %00000000
+    DB 100, 100, 00, 03
+
+sc03_MiB1_R2::
+    DB CMP_RESERVE, %01110101, %01000000, 01
+    DB 46, 58, $3C, %00000000
+    DB 100, 100, 00, 03
+
+sc03_MiB1_L3::
+    DB CMP_RESERVE, %01110101, %01000000, 01
+    DB 120, 120, $3A, %00000000
+    DB 100, 100, 00, 03
+
+sc03_MiB1_R3::
+    DB CMP_RESERVE, %01110101, %01000000, 01
+    DB 120, 128, $3C, %00000000
+    DB 100, 100, 00, 03
+
+sc03_CC_L1::
+    DB CMP_RESERVE, %01110101, %00100000, 01
+    DB 60, 60, $62, %00000000
+    DB 100, 100, 00, 00
+
+sc03_CC_R1::
+    DB CMP_RESERVE, %01110101, %00100000, 01
+    DB 60, 68, $64, %00000000
+    DB 100, 100, 00, 00
+sc03_entities_REST_END::

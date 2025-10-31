@@ -1,17 +1,13 @@
 include "constantes.inc"
 
 
-; Valor de ticks entre inversiones (ajusta a gusto)
-
 
 SECTION "Global Patrol WRAM", WRAM0 [$c300]
 wFlipCounter:: ds 1
 
 SECTION "Global Patrol CODE", ROM0
 DEF COUNTER_RESET EQU 50
-; --- Init: poner el contador al periodo fijo ---
 
-; Mantengo esta si ya la llamas en sitios antiguos: resetea usando wFlipPeriod.
 patrol_global_init::
   ld a, COUNTER_RESET
   ld  [wFlipCounter], a
@@ -32,14 +28,11 @@ patrol_global_tick::
     ret
 
 
-; --- Iterador: invierte vel. de TODOS los enemigos ---
 invert_vel_all_enemies::
     ld   hl, invert_vel_one
     call man_entity_for_each
     ret
 
-; --- Acción por entidad: invertimos sólo ENEMIGOS ---
-;     (Quita el filtro si quieres TODAS las entidades)
 invert_vel_one::
     ; filtro ENEMIGO
     ld   h, CMP_INFO_H

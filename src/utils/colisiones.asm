@@ -2,17 +2,6 @@ INCLUDE "constantes.inc"
 
 SECTION "CollisionUtils", ROM0
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Gets the Address in VRAM of the tile the entity is touching
-;; Receives the address of the sprite component in HL:
-;; Address: |HL| +1| +2 | +3|
-;; Value    [ y][ x][id][at]
-;; Example: Sprite at (24, 32)
-;;   TX = (24 - 8)/8 = 2
-;;   TY = (32-16)/8  = 2
-;; Address = BASE + 32TY + TX = $9800 + 2*32+2= $9842
-;; INPUT: HL: address of the sprite
-;; OUTPUT: HL: VRAM address of the tile
 get_address_of_tile_being_touched:
     .y_to_ty
     ld a, [hl+]
@@ -22,9 +11,6 @@ get_address_of_tile_being_touched:
     ld a, [hl]
     call convert_x_to_tx
     ld c, a     ;;X = TX
-    ; ld de, $9800 ;;BASE ADDRESS = $9800 (VRAM Tilemap 1)
-    ; la base del BG map puede ser $9800 o $9C00 (LCDC.3).
-    ; dinámica
     call get_bg_base      ; DE = $9800 o $9C00 según LCDC.3
     call calculate_address_from_tx_and_ty
     ret
@@ -48,16 +34,6 @@ convert_x_to_tx:
     ret
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Calculates a VRAM Tilemap address from itx tile
-;; coordinates (TX, TY). The tilemap is 32x32, and		
-;; addresss of tile (0,0) in tile coordinates.
-;; INPUT:
-;;   DE: BASE ADDRESS
-;;   B: TY
-;;   C: TX
-;; OUTPUT:
-;;   HL: Address where the (TX, TY) tile is located
 calculate_address_from_tx_and_ty:
     ;; TILE-ADDRESS = BASE + 32*TY + TX
     ld h, 0
@@ -76,19 +52,6 @@ calculate_address_from_tx_and_ty:
     add hl, de ;; HL = BASE + 32*TY + TX
     ret
 
-
-
-; ==================================================
-;  - Base BG map dinámica (LCDC.3)
-;  - Versiones con scroll (SCX/SCY) y wrap 32x32
-;  - Helper de lectura segura de VRAM (opcional)
-;  - Variante "scrolled" para obtener dirección VRAM
-; ==================================================
-
-;----------------------------------------
-; Devuelve en DE la base del BG Map según LCDC.3
-;   LCDC bit 3 = 0 -> $9800 ; =1 -> $9C00
-;----------------------------------------
 get_bg_base:
     ldh  a, [$FF40]      ; LCDC
     and  %00001000       ; bit 3
@@ -100,11 +63,6 @@ get_bg_base:
     ret
 
 
-;----------------------------------------
-; Versiones con scroll y wrap 32x32
-;   - Entradas: A = coord OAM (px)
-;   - Salidas : A = TX/TY en rango 0..31
-;----------------------------------------
 
 ; A = X (OAM)  -> A = TX con scroll
 convert_x_to_tx_scrolled:
@@ -130,11 +88,6 @@ convert_y_to_ty_scrolled:
     and %00011111         ; wrap 0..31
 ret
 
-;----------------------------------------
-; Variante con scroll + base dinámica para debug:
-; HL = &sprite [y][x][id][at]
-; Devuelve HL = dirección en BG map (con SCX/SCY y base LCDC)
-;----------------------------------------
 get_vram_addr_under_sprite_scrolled:
     push bc
     push de

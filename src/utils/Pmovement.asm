@@ -32,12 +32,6 @@ get_player_speed::
     ld [wPlayerSpeedU], a
 ret
 
-
-; -------------------------------------------------
-; player_cache_speed_from_entity
-; DE -> &component_info[offset] del PLAYER
-; Lee PH_VX/PH_VY y los guarda en wPlayerSpeedX/Y.
-; -------------------------------------------------
 player_read_dpad::
     ld   a, P1F_GET_DPAD   ; seleccionar D-pad
     ld  [rP1], a
@@ -46,70 +40,6 @@ player_read_dpad::
     and  %00001111         ; nos quedamos con Right,Left,Up,Down
     ret
 
-
-
-;; ESTO DABA BUG POR USAR BIT Y NO AND, ESTE CODIGO ES LEGACY POR SI HACE FALTA PARA ALGO
-    ; =========================================================
-; Procesa UNA entidad: si es PLAYER, escribe PH_VX/PH_VY
-; Entrada: DE -> &component_info[offset] de la entidad
-; Trashes: A, B, C, H, L
-; =========================================================
-; sys_player_update_one_entity::
-;     ld   h, CMP_INFO_H
-;     ld   l, e
-;     ld   a, l
-;     add  CMP_INFO_TYPE
-;     ld   l, a
-;     ld   a, [hl]
-;     bit  T_PLAYER, a         ; bit7 = player
-;     ret  z                   ; si no es player, salir
-
-;     ; --- leer D-pad ---
-;     call player_read_dpad    ; A = PAD mask (1=pulsado)
-
-;     ; --- VX = (Right) - (Left) ---
- 
-;     ld   b, 0
-;     bit  PADF_RIGHT_BIT, a              
-;     jr   z, .no_r
-;     ld a, [wPlayerSpeedR]
-;     ld b, a
-; .no_r:
-;     bit  PADF_LEFT_BIT, a
-;     jr   z, .no_l
-;     ld a, [wPlayerSpeedL]
-;     ld b, a
-; .no_l:
-;     ld   c, 0
-;     bit  PADF_DOWN_BIT, a               
-;     jr   z, .no_d
-;     ld a, [wPlayerSpeedD]
-;     ld c, a
-; .no_d:
-;     bit  PADF_UP_BIT, a
-;     jr   z, .no_u
-;     ld a, [wPlayerSpeedU]
-;     ld c, a
-; .no_u:
-
-;     ; --- escribir PH_VX ---
-;     ld   h, CMP_PHYSICS_H
-;     ld   l, e
-;     ld   a, l
-;     add  CMP_PH_VX
-;     ld   l, a                ; HL = &PH_VX
-;     ld   a, b               
-;     ld  [hl], a
-
-;     ; --- escribir PH_VY ---
-;     ld   h, CMP_PHYSICS_H
-;     ld   l, e
-;     ld   a, l
-;     add  CMP_PH_VY
-;     ld   l, a                ; HL = &PH_VY
-;     ld   a, c                ; A = vy (-1/0/+1) (abajo es positivo)
-;     ld  [hl], a
-; ret
 
 ; DE -> &component_info[offset] de la entidad
 sys_player_update_one_entity::

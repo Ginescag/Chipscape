@@ -313,7 +313,6 @@ sys_anim_enemies_update_one::
     ret  z                        ; no enemigo
 
     ; SPRITE.TI para detectar si es izquierda o derecha:
-    ; si esta entidad es claramente "derecha", salimos para evitar doble-animar
     ld   h, CMP_SPRITE_H
     ld   l, e
     ld   a, l
@@ -321,7 +320,6 @@ sys_anim_enemies_update_one::
     ld   l, a
     ld   a, [hl]
     ; ¿pertenece a alguno de los RIGHT bases (MIB_Rr/Dr/Lr/Ur y BC_Rr/Dr/Lr/Ur) o sus +4?
-    ; MiB right set:
     cp   TILE_MIB_Dr
     ret  z
     cp   TILE_MIB_Dr+4
@@ -367,8 +365,6 @@ sys_anim_enemies_update_one::
     ld   b, a         ; vx
     ld   a, l
     ld   a, [hl+]
-    ; cuidado: [hl+] no, mejor: recalcula VY correctamente
-    ; Rehacemos:
     ld   h, CMP_PHYSICS_H
     ld   l, e
     ld   a, l
@@ -404,7 +400,7 @@ sys_anim_enemies_update_one::
     ld   d, 0             ; DOWN
 .dir_ok:
 
-    ; ¿MIB o BC?
+    ;¿MIB o BC?
     push de
     call get_enemy_kind     ; A = 0 MIB / 1 BC
     ld   b, a
