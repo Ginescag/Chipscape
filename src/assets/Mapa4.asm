@@ -1,6 +1,6 @@
-SECTION "mapa3", ROM0
+SECTION "mapa4", ROM0
 
-mapa3::
+mapa4::
 DB $C2,$B8,$B8,$B8,$B8,$B8,$B8,$B8,$B8,$B8
 DB $B8,$B8,$B8,$B8,$B8,$B8,$B8,$B8,$B8,$B8
 DB $B8,$B8,$B8,$B8,$B8,$B8,$B8,$B8,$B8,$B8
@@ -105,4 +105,3 @@ DB $C3,$C3,$C3,$C3,$C3,$C3,$C3,$C3,$C3,$C3
 DB $C3,$C3,$C3,$C3,$C3,$C3,$C3,$C3,$C3,$C3
 DB $C3,$C3,$C3,$C3
 mapa3fin::
-
