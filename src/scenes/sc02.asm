@@ -95,6 +95,8 @@ sc02_run::
     call sys_physics_update
     
     ld de, $C000              ;;magic exagerada posicion en el array de entidades del personaje
+    call check_player_cross_any_and_gameover
+    ld de, $C000              ;;magic exagerada posicion en el array de entidades del personaje
     call animacion_personaje
     call sys_anim_enemies_update
     call Scroll_Tick

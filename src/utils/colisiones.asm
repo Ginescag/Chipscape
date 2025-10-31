@@ -1,115 +1,5 @@
 INCLUDE "constantes.inc"
 
-SECTION "CollisionUtils", ROM0
-
-get_address_of_tile_being_touched:
-    .y_to_ty
-    ld a, [hl+]
-    call convert_y_to_ty
-    ld b, a     ;;B = TY
-    .x_to_tx
-    ld a, [hl]
-    call convert_x_to_tx
-    ld c, a     ;;X = TX
-    call get_bg_base      ; DE = $9800 o $9C00 según LCDC.3
-    call calculate_address_from_tx_and_ty
-    ret
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Converts Y coordinate to a TY tile coordinate
-convert_y_to_ty:
-    sub 16      ;; Adjust for tilemap offset
-    srl a    ;; Divide by 2
-    srl a    ;; Divide by 4
-    srl a    ;; Divide by 8
-    ret
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Converts X coordinate to a TX tile coordinate
-convert_x_to_tx:
-    sub 8       ;; Adjust for tilemap offset
-    srl a    ;; Divide by 2
-    srl a    ;; Divide by 4
-    srl a    ;; Divide by 8
-    ret
-
-
-calculate_address_from_tx_and_ty:
-    ;; TILE-ADDRESS = BASE + 32*TY + TX
-    ld h, 0
-    ld l, b
-    add hl, hl ;; HL = 2*TY
-    add hl, hl ;; HL = 4*TY
-    add hl, hl ;; HL = 8*TY
-    add hl, hl ;; HL = 16*TY
-    add hl, hl ;; HL = 32*TY
-    
-    .add_tx
-    ld b, 0
-    add hl, bc ;; HL = 32*TY + TX
-
-    .add_base
-    add hl, de ;; HL = BASE + 32*TY + TX
-    ret
-
-get_bg_base:
-    ldh  a, [$FF40]      ; LCDC
-    and  %00001000       ; bit 3
-    jr   z, .use_9800
-    ld   de, $9C00
-    ret
-.use_9800:
-    ld   de, $9800
-    ret
-
-
-
-; A = X (OAM)  -> A = TX con scroll
-convert_x_to_tx_scrolled:
-    sub 8                 ; Ajuste OAM X
-    ld  b, a
-    ldh a, [$FF43]        ; SCX
-    add a, b
-    srl a                 ; >>3
-    srl a
-    srl a
-    and %00011111         ; wrap 0..31
-    ret
-
-; A = Y (OAM)  -> A = TY con scroll
-convert_y_to_ty_scrolled:
-    sub 16                ; Ajuste OAM Y
-    ld  b, a
-    ldh a, [$FF42]        ; SCY
-    add a, b
-    srl a                 ; >>3
-    srl a
-    srl a
-    and %00011111         ; wrap 0..31
-ret
-
-get_vram_addr_under_sprite_scrolled:
-    push bc
-    push de
-
-    ; TY (con scroll)
-    ld  a, [hl+]                 ; y
-    call convert_y_to_ty_scrolled
-    ld  b, a                     ; B = TY
-
-    ; TX (con scroll)
-    ld  a, [hl]                  ; x  (HL ya apunta a x tras [hl+])
-    call convert_x_to_tx_scrolled
-    ld  c, a                     ; C = TX
-
-    ; Base dinámica y cálculo de dirección
-    call get_bg_base             ; DE = $9800 / $9C00
-    call calculate_address_from_tx_and_ty  ; HL = base + 32*TY + TX
-
-    pop  de
-    pop  bc
-ret
-
 SECTION "CollisionEntities", ROM0
 
 ; --- Interval overlap (1D) ---
@@ -155,16 +45,6 @@ are_intervals_overlapping::
     or   a               ; C=0
     ret
 
-
-; --- AABB overlap (2D) ---
-; 1. Checks if they collide on the Y axis
-; 2. Checks if they collide on the X axis only if Y overlaps
-; Receives in DE and BC the addresses of the two AABBs:
-;              --AABB1--            --AABB2--
-; Address: |DE| +1| +2| +3|     |BC| +1| +2| +3|
-; Value:   [y1][h1][x1][w1]     [y2][h2][x2][w2]
-; Returns Carry Flag (C=0 NC) when NOT-Colliding,
-;                  and (C=1 C) when Colliding
 ; INPUT:
 ;        DE: address of AABB 1
 ;        BC: address of AABB 2
@@ -206,4 +86,93 @@ are_boxes_colliding::
     pop  bc
     pop  de
     or   a
+ret
+
+
+SECTION "AABB Temp", WRAM0
+wAABB_Player:: ds 4   ; [y][h][x][w]
+wAABB_Entity:: ds 4   ; [y][h][x][w]
+wSkipIdxL::    ds 1   ; índice a ignorar (player izquierda)
+wSkipIdxR::    ds 1   ; índice a ignorar (player derecha)
+
+SECTION "CrossCheck CODE", ROM0
+
+DEF PLAYER_W  EQU 8     ; pon 16 si tu player son 2 columnas (16×16)
+DEF PLAYER_H  EQU 16
+DEF ENEMY_W   EQU 8
+DEF ENEMY_H   EQU 16
+
+check_player_cross_any_and_gameover::
+; Guardar índices a ignorar (player L/R)
+ld   a, e
+ld  [wSkipIdxL], a
+ld   a, e
+add  a, CMP_SIZE
+ld  [wSkipIdxR], a
+
+; ----- Construir AABB del player -----
+; Leer X,Y del player (desde componente SPRITE)
+ld   h, CMP_SPRITE_H
+ld   l, e
+ld   a, l
+add  CMP_SPRITE_Y
+ld   l, a
+ld   a, [hl]              ; A = Yp
+ld  [wAABB_Player+0], a
+ld   a, PLAYER_H
+ld  [wAABB_Player+1], a
+ld   h, CMP_SPRITE_H
+ld   l, e
+ld   a, l
+add  CMP_SPRITE_X
+ld   l, a
+ld   a, [hl]              ; A = Xp
+ld  [wAABB_Player+2], a
+ld   a, PLAYER_W
+ld  [wAABB_Player+3], a
+
+; Iterar entidades con callback
+ld   hl, _aabb_overlap_one_entity
+call man_entity_for_each
+ret                       ; sin colisión
+
+_aabb_overlap_one_entity::
+; ignorar player L/R
+ld   a, [wSkipIdxL]
+cp   e
+ret  z
+ld   a, [wSkipIdxR]
+cp   e
+ret  z
+
+; ----- Construir AABB de la entidad E (8×16 por defecto) -----
+; Y
+ld   h, CMP_SPRITE_H
+ld   l, e
+ld   a, l
+add  CMP_SPRITE_Y
+ld   l, a
+ld   a, [hl]
+ld  [wAABB_Entity+0], a
+; H
+ld   a, ENEMY_H
+ld  [wAABB_Entity+1], a
+; X
+ld   h, CMP_SPRITE_H
+ld   l, e
+ld   a, l
+add  CMP_SPRITE_X
+ld   l, a
+ld   a, [hl]
+ld  [wAABB_Entity+2], a
+; W
+ld   a, ENEMY_W
+ld  [wAABB_Entity+3], a
+
+; ----- Test de solape: usa are_boxes_colliding -----
+; DE = &AABB_Player, BC = &AABB_Entity
+ld   de, wAABB_Player
+ld   bc, wAABB_Entity
+call are_boxes_colliding   ; C=1 si colisiona
+jp   c, game_over_animated
 ret
